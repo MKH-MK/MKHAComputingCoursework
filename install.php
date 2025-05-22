@@ -54,6 +54,7 @@ try {
     // Prefill events for Tbl_Event
     $insert = $conn->prepare("INSERT INTO tblevent (eventName, course, gender) VALUES
     INSERT INTO tblevent (eventName, course, gender) VALUES
+    
     ('Freestyle 50m', 'L', 'M'),
     ('Freestyle 50m', 'L', 'F'),
     ('Freestyle 50m', 'S', 'M'),
