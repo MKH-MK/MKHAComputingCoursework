@@ -40,7 +40,7 @@ try {
     $stmt = $conn->prepare("DROP TABLE IF EXISTS tblevent;
 
     CREATE TABLE tblevent (
-    eventID INT AUTO_INCREMENT PRIMARY KEY,
+    eventID INT(3) AUTO_INCREMENT PRIMARY KEY,
     eventName VARCHAR(100) NOT NULL,
     course ENUM('L', 'S') NOT NULL,
     gender ENUM('M', 'F', 'MIX') NOT NULL
@@ -167,14 +167,17 @@ try {
     $insert->execute();
     $insert->closeCursor();
 
-echo "<br>tblevent created and populated";
+    echo "<br>tblevent created and populated";
 
 
     // Create Tbl_Meet
     $stmt = $conn->prepare("DROP TABLE IF EXISTS tblmeet;
 
     CREATE TABLE tblmeet (
-    
+    meetID INT(6) AUTO_INCREMENT PRIMARY KEY,
+    meetName VARCHAR(100) NOT NULL,
+    meetInfo TEXT NOT NULL,
+    external ENUM('Y', 'N')
     );");
 
     $stmt->execute();
@@ -186,7 +189,12 @@ echo "<br>tblevent created and populated";
     $stmt = $conn->prepare("DROP TABLE IF EXISTS tblmeetHasEvent;
 
     CREATE TABLE tblmeetHasEvent (
-    
+    meetID INT(6),
+    eventID INT(3),
+
+    PRIMARY KEY (meetID, eventID),
+    FOREIGN KEY (meetID) REFERENCES tblmeet(meetID) ON DELETE CASCADE,
+    FOREIGN KEY (eventID) REFERENCES tblevent(eventID) ON DELETE CASCADE
     );");
 
     $stmt->execute();
@@ -207,12 +215,13 @@ echo "<br>tblevent created and populated";
 
 
     $hashed_password = password_hash("passwd", PASSWORD_DEFAULT);
-    $stmt = $conn->prepare("INSERT INTO tblstudents (userid, username, surname, forename, passwd, gender, house, yearg, role) VALUES 
-    (NULL, 'Mark.KHA', 'Khametov', 'Mark', :hp, 'M', 'Crosby', 12, 2)");
-   
+    $stmt = $conn->prepare("INSERT INTO tbluser (userid, passwd, role, surname, forename, yearg, emailAddress, userName, gender, description) VALUES 
+    (NULL, 'Mark123', 'Khametov', 'Mark', 12, 'khametov.m@oundleschool.org.uk', NULL, 'M', 'I love testing, testing, testing')");
+    
     $stmt->bindParam(':hp', $hashed_password);
+    
     $stmt->execute();
-    // $stmt->closeCursor();
+    $stmt->closeCursor();
 
 }
 catch(PDOException $e)
