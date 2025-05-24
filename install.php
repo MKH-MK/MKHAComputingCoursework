@@ -201,17 +201,35 @@ try {
     $stmt->closeCursor();
     echo "<br>tblmeetHasEvent created";
 
+    // After creating tblmeetHasEvent, create an index
+    $stmt = $conn->prepare("CREATE INDEX idxMeetEvent ON tblmeetHasEvent (meetID, eventID);");
+    $stmt->execute();
+    $stmt->closeCursor();
+    echo "<br>Index idxMeetEvent created";
+
 
     // Create Tbl_MeetEventHasSwimmer
     $stmt = $conn->prepare("DROP TABLE IF EXISTS tblmeetEventHasSwimmer;
 
     CREATE TABLE tblmeetEventHasSwimmer (
-    
+    userID INT,
+    meetID INT(6),
+    eventID INT(3),
+
+    PRIMARY KEY (userID, meetID, eventID),
+    FOREIGN KEY (meetID, eventID) REFERENCES tblmeetHasEvent(meetID, eventID) ON DELETE CASCADE,
+    FOREIGN KEY (userID) REFERENCES tbluser(userID) ON DELETE CASCADE   
     );");
 
     $stmt->execute();
     $stmt->closeCursor();
     echo "<br>tblmeetEventHasSwimmer created";
+    
+    // After creating tblmeetEventHasSwimmer, create an index
+    $stmt = $conn->prepare("CREATE INDEX idxUserMeetEvent ON tblmeetEventHasSwimmer (userID, meetID, eventID);");
+    $stmt->execute();
+    $stmt->closeCursor();
+    echo "<br>Index idxUserMeetEvent created";
 
 
     $hashed_password = password_hash("passwd", PASSWORD_DEFAULT);
