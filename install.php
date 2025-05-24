@@ -8,20 +8,17 @@ try {
     // Create initial connection
     $conn = new PDO("mysql:host=$servername", $username, $password);
     $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    
-    $sql = "CREATE DATABASE IF NOT EXISTS oundswimteam";
-    $conn->exec($sql);
-    
-    // Connect to database
+
+    $conn->exec("DROP DATABASE IF EXISTS oundswimteam");
+    $conn->exec("CREATE DATABASE oundswimteam");
+    echo "DB made";
+
+    // Connect to DB
     $conn = new PDO("mysql:host=$servername;dbname=oundswimteam", $username, $password);
     $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     echo "Connection made";
 
     // Create Tbl_User
-    $stmt = $conn->prepare("DROP TABLE IF EXISTS tbluser;");
-    $stmt->execute();
-    $stmt->closeCursor();
-
     $stmt = $conn->prepare(
         "CREATE TABLE tbluser (
             userID INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -43,10 +40,6 @@ try {
 
 
     // Create Tbl_Event
-    $stmt = $conn->prepare("DROP TABLE IF EXISTS tblevent;");
-    $stmt->execute();
-    $stmt->closeCursor();
-
     $stmt = $conn->prepare(
         "CREATE TABLE tblevent (
             eventID INT(3) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -59,7 +52,6 @@ try {
     $stmt->execute();
     $stmt->closeCursor();
     echo "<br>tblevent created";
-
 
     // Prefill events for Tbl_Event
     $insert_sql = "INSERT INTO tblevent (eventName, course, gender) VALUES
@@ -178,10 +170,6 @@ try {
     echo "<br>tblevent populated";
 
     // Create Tbl_Meet
-    $stmt = $conn->prepare("DROP TABLE IF EXISTS tblmeet;");
-    $stmt->execute();
-    $stmt->closeCursor();
-
     $stmt = $conn->prepare(
         "CREATE TABLE tblmeet (
             meetID INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -196,10 +184,6 @@ try {
 
 
     // Create Tbl_MeetHasEvent
-    $stmt = $conn->prepare("DROP TABLE IF EXISTS tblmeetHasEvent;");
-    $stmt->execute();
-    $stmt->closeCursor();
-
     $stmt = $conn->prepare(
         "CREATE TABLE tblmeetHasEvent (
             meetID INT(6) UNSIGNED,
@@ -216,10 +200,6 @@ try {
 
 
     // Create Tbl_MeetEventHasSwimmer
-    $stmt = $conn->prepare("DROP TABLE IF EXISTS tblmeetEventHasSwimmer;");
-    $stmt->execute();
-    $stmt->closeCursor();
-
     $stmt = $conn->prepare(
         "CREATE TABLE tblmeetEventHasSwimmer (
             userID INT(6) UNSIGNED,
