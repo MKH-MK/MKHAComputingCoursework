@@ -16,9 +16,9 @@ try {
 
 
     // Create Tbl_User
-    $stmt = $conn->prepare("DROP TABLE IF EXISTS tblusers;
+    $stmt = $conn->prepare("DROP TABLE IF EXISTS tbluser;
 
-    CREATE TABLE tblusers (
+    CREATE TABLE tbluser (
     userid INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     passwd VARCHAR(255) NOT NULL,
     role TINYINT(1),
@@ -27,13 +27,13 @@ try {
     yearg INT(2) NOT NULL,
     emailAddress VARCHAR(40) NOT NULL,
     userName VARCHAR(25) NOT NULL,
-    gender VARCHAR(1) NOT NULL,
-    description TEXT NOT NULL,
+    gender ENUM('M', 'F') NOT NULL,
+    description TEXT NOT NULL
     );");
 
     $stmt->execute();
     $stmt->closeCursor();
-    echo "<br>tblusers created";
+    echo "<br>tbluser created";
 
 
     // Create Tbl_Event
@@ -201,12 +201,6 @@ try {
     $stmt->closeCursor();
     echo "<br>tblmeetHasEvent created";
 
-    // After creating tblmeetHasEvent, create an index
-    $stmt = $conn->prepare("CREATE INDEX idxMeetEvent ON tblmeetHasEvent (meetID, eventID);");
-    $stmt->execute();
-    $stmt->closeCursor();
-    echo "<br>Index idxMeetEvent created";
-
 
     // Create Tbl_MeetEventHasSwimmer
     $stmt = $conn->prepare("DROP TABLE IF EXISTS tblmeetEventHasSwimmer;
@@ -224,21 +218,26 @@ try {
     $stmt->execute();
     $stmt->closeCursor();
     echo "<br>tblmeetEventHasSwimmer created";
-    
-    // After creating tblmeetEventHasSwimmer, create an index
-    $stmt = $conn->prepare("CREATE INDEX idxUserMeetEvent ON tblmeetEventHasSwimmer (userID, meetID, eventID);");
-    $stmt->execute();
-    $stmt->closeCursor();
-    echo "<br>Index idxUserMeetEvent created";
 
 
-    $hashed_password = password_hash("passwd", PASSWORD_DEFAULT);
-    $stmt = $conn->prepare("INSERT INTO tbluser (userid, passwd, role, surname, forename, yearg, emailAddress, userName, gender, description) VALUES 
-    (NULL, 'Mark123', 'Khametov', 'Mark', 12, 'khametov.m@oundleschool.org.uk', NULL, 'M', 'I love testing, testing, testing')");
+    $hashed_password = password_hash("Mark123", PASSWORD_DEFAULT);
+    $stmt = $conn->prepare(
+        "INSERT INTO tbluser (passwd, role, surname, forename, yearg, emailAddress, userName, gender, description)
+         VALUES (:passwd, :role, :surname, :forename, :yearg, :emailAddress, :userName, :gender, :description)"
+    );
     
-    $stmt->bindParam(':hp', $hashed_password);
-    
-    $stmt->execute();
+    $stmt->execute([
+        ':passwd' => $hashed_password,
+        ':role' => 2,
+        ':surname' => 'Khametov',
+        ':forename' => 'Mark',
+        ':yearg' => 12,
+        ':emailAddress' => 'khametov.m@oundleschool.org.uk',
+        ':userName' => 'Mark123',
+        ':gender' => 'M',
+        ':description' => 'I love testing, testing, testing'
+    ]);
+
     $stmt->closeCursor();
 
 }
