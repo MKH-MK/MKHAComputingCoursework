@@ -7,12 +7,14 @@ $password = "";
 try {
     $conn = new PDO("mysql:host=$servername", $username, $password);
     $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    
     $sql = "CREATE DATABASE IF NOT EXISTS oundswimteam";
     $conn->exec($sql);
     
     $sql = "USE oundswimteam";
     $conn->exec($sql);
-    #echo "DB created successfully";
+
+    $conn->beginTransaction();
 
 
     // Create Tbl_User
@@ -206,9 +208,10 @@ try {
     $stmt = $conn->prepare("DROP TABLE IF EXISTS tblmeetEventHasSwimmer;
 
     CREATE TABLE tblmeetEventHasSwimmer (
-    userID INT,
+    userID INT(6),
     meetID INT(6),
     eventID INT(3),
+    time VARCHAR(8),
 
     PRIMARY KEY (userID, meetID, eventID),
     FOREIGN KEY (meetID, eventID) REFERENCES tblmeetHasEvent(meetID, eventID) ON DELETE CASCADE,
@@ -240,10 +243,15 @@ try {
 
     $stmt->closeCursor();
 
-}
-catch(PDOException $e)
-{
-    echo $sql . "<br>" . $e->getMessage();
+    $conn->commit();
+    echo "<br>Database created successfully";
+
+} catch(PDOException $e) {
+    // Roll back all changes if any error occurs
+    if ($conn->inTransaction()) {
+        $conn->rollBack();
+    }
+    echo "<br>Database setup failed: " . $e->getMessage();
 }
 $conn = null;
 
