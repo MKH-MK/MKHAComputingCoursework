@@ -15,9 +15,7 @@ try {
     // Connect to database
     $conn = new PDO("mysql:host=$servername;dbname=oundswimteam", $username, $password);
     $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-
-    $conn->beginTransaction();
-
+    echo "Connection made";
 
     // Create Tbl_User
     $stmt = $conn->prepare("DROP TABLE IF EXISTS tbluser;");
@@ -51,7 +49,7 @@ try {
 
     $stmt = $conn->prepare(
         "CREATE TABLE tblevent (
-            eventID INT(3) AUTO_INCREMENT PRIMARY KEY,
+            eventID INT(3) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             eventName VARCHAR(100) NOT NULL,
             course ENUM('L', 'S') NOT NULL,
             gender ENUM('M', 'F', 'MIX') NOT NULL
@@ -186,7 +184,7 @@ try {
 
     $stmt = $conn->prepare(
         "CREATE TABLE tblmeet (
-            meetID INT(6) AUTO_INCREMENT PRIMARY KEY,
+            meetID INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             meetName VARCHAR(100) NOT NULL,
             meetInfo TEXT NOT NULL,
             external ENUM('Y', 'N')
@@ -204,8 +202,8 @@ try {
 
     $stmt = $conn->prepare(
         "CREATE TABLE tblmeetHasEvent (
-            meetID INT(6),
-            eventID INT(3),
+            meetID INT(6) UNSIGNED,
+            eventID INT(3) UNSIGNED,
 
             PRIMARY KEY (meetID, eventID),
             FOREIGN KEY (meetID) REFERENCES tblmeet(meetID) ON DELETE CASCADE,
@@ -224,11 +222,11 @@ try {
 
     $stmt = $conn->prepare(
         "CREATE TABLE tblmeetEventHasSwimmer (
-            userID INT(6),
-            meetID INT(6),
-            eventID INT(3),
+            userID INT(6) UNSIGNED,
+            meetID INT(6) UNSIGNED,
+            eventID INT(3) UNSIGNED,
             time VARCHAR(8),
-            
+
             PRIMARY KEY (userID, meetID, eventID),
             FOREIGN KEY (meetID, eventID) REFERENCES tblmeetHasEvent(meetID, eventID) ON DELETE CASCADE,
             FOREIGN KEY (userID) REFERENCES tbluser(userid) ON DELETE CASCADE
@@ -256,17 +254,11 @@ try {
         ':gender' => 'M',
         ':description' => 'I love testing, testing, testing'
     ]);
-
     $stmt->closeCursor();
 
-    $conn->commit();
     echo "<br>Database created successfully";
 
 } catch(PDOException $e) {
-    // Roll back all changes if any error occurs
-    if ($conn->inTransaction()) {
-        $conn->rollBack();
-    }
     echo "<br>Database setup failed: " . $e->getMessage();
 }
 $conn = null;
