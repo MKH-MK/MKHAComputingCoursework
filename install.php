@@ -5,33 +5,39 @@ $username = "root";
 $password = "";
 
 try {
+    // Create initial connection
     $conn = new PDO("mysql:host=$servername", $username, $password);
     $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     
     $sql = "CREATE DATABASE IF NOT EXISTS oundswimteam";
     $conn->exec($sql);
     
-    $sql = "USE oundswimteam";
-    $conn->exec($sql);
+    // Connect to database
+    $conn = new PDO("mysql:host=$servername;dbname=oundswimteam", $username, $password);
+    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
     $conn->beginTransaction();
 
 
     // Create Tbl_User
-    $stmt = $conn->prepare("DROP TABLE IF EXISTS tbluser;
+    $stmt = $conn->prepare("DROP TABLE IF EXISTS tbluser;");
+    $stmt->execute();
+    $stmt->closeCursor();
 
-    CREATE TABLE tbluser (
-    userid INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    passwd VARCHAR(255) NOT NULL,
-    role TINYINT(1),
-    surname VARCHAR(25) NOT NULL,
-    forename VARCHAR(25) NOT NULL,
-    yearg INT(2) NOT NULL,
-    emailAddress VARCHAR(40) NOT NULL,
-    userName VARCHAR(25) NOT NULL,
-    gender ENUM('M', 'F') NOT NULL,
-    description TEXT NOT NULL
-    );");
+    $stmt = $conn->prepare(
+        "CREATE TABLE tbluser (
+            userID INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            passwd VARCHAR(255) NOT NULL,
+            role TINYINT(1),
+            surname VARCHAR(25) NOT NULL,
+            forename VARCHAR(25) NOT NULL,
+            yearg INT(2) NOT NULL,
+            emailAddress VARCHAR(100) NOT NULL,
+            userName VARCHAR(25) NOT NULL,
+            gender ENUM('M', 'F') NOT NULL,
+            description TEXT NOT NULL
+        );"
+    );
 
     $stmt->execute();
     $stmt->closeCursor();
@@ -39,14 +45,18 @@ try {
 
 
     // Create Tbl_Event
-    $stmt = $conn->prepare("DROP TABLE IF EXISTS tblevent;
+    $stmt = $conn->prepare("DROP TABLE IF EXISTS tblevent;");
+    $stmt->execute();
+    $stmt->closeCursor();
 
-    CREATE TABLE tblevent (
-    eventID INT(3) AUTO_INCREMENT PRIMARY KEY,
-    eventName VARCHAR(100) NOT NULL,
-    course ENUM('L', 'S') NOT NULL,
-    gender ENUM('M', 'F', 'MIX') NOT NULL
-    );");
+    $stmt = $conn->prepare(
+        "CREATE TABLE tblevent (
+            eventID INT(3) AUTO_INCREMENT PRIMARY KEY,
+            eventName VARCHAR(100) NOT NULL,
+            course ENUM('L', 'S') NOT NULL,
+            gender ENUM('M', 'F', 'MIX') NOT NULL
+        );"
+    );
 
     $stmt->execute();
     $stmt->closeCursor();
@@ -54,8 +64,7 @@ try {
 
 
     // Prefill events for Tbl_Event
-    $insert = $conn->prepare("INSERT INTO tblevent (eventName, course, gender) VALUES
-    INSERT INTO tblevent (eventName, course, gender) VALUES
+    $insert_sql = "INSERT INTO tblevent (eventName, course, gender) VALUES
     
     ('Freestyle 50m', 'L', 'M'),
     ('Freestyle 50m', 'L', 'F'),
@@ -163,61 +172,68 @@ try {
     ('Freestyle Relay 400m', 'L', 'MIX'),
     ('Freestyle Relay 400m', 'S', 'MIX'),
     ('Medlay Relay 400m', 'L', 'MIX'),
-    ('Medlay Relay 400m', 'S', 'MIX'),
-    
-    ;");
-    $insert->execute();
-    $insert->closeCursor();
+    ('Medlay Relay 400m', 'S', 'MIX')";
 
-    echo "<br>tblevent created and populated";
-
+    $stmt = $conn->prepare($insert_sql);
+    $stmt->execute();
+    $stmt->closeCursor();
+    echo "<br>tblevent populated";
 
     // Create Tbl_Meet
-    $stmt = $conn->prepare("DROP TABLE IF EXISTS tblmeet;
+    $stmt = $conn->prepare("DROP TABLE IF EXISTS tblmeet;");
+    $stmt->execute();
+    $stmt->closeCursor();
 
-    CREATE TABLE tblmeet (
-    meetID INT(6) AUTO_INCREMENT PRIMARY KEY,
-    meetName VARCHAR(100) NOT NULL,
-    meetInfo TEXT NOT NULL,
-    external ENUM('Y', 'N')
-    );");
-
+    $stmt = $conn->prepare(
+        "CREATE TABLE tblmeet (
+            meetID INT(6) AUTO_INCREMENT PRIMARY KEY,
+            meetName VARCHAR(100) NOT NULL,
+            meetInfo TEXT NOT NULL,
+            external ENUM('Y', 'N')
+        );"
+    );
     $stmt->execute();
     $stmt->closeCursor();
     echo "<br>tblmeet created";
 
 
     // Create Tbl_MeetHasEvent
-    $stmt = $conn->prepare("DROP TABLE IF EXISTS tblmeetHasEvent;
+    $stmt = $conn->prepare("DROP TABLE IF EXISTS tblmeetHasEvent;");
+    $stmt->execute();
+    $stmt->closeCursor();
 
-    CREATE TABLE tblmeetHasEvent (
-    meetID INT(6),
-    eventID INT(3),
+    $stmt = $conn->prepare(
+        "CREATE TABLE tblmeetHasEvent (
+            meetID INT(6),
+            eventID INT(3),
 
-    PRIMARY KEY (meetID, eventID),
-    FOREIGN KEY (meetID) REFERENCES tblmeet(meetID) ON DELETE CASCADE,
-    FOREIGN KEY (eventID) REFERENCES tblevent(eventID) ON DELETE CASCADE
-    );");
-
+            PRIMARY KEY (meetID, eventID),
+            FOREIGN KEY (meetID) REFERENCES tblmeet(meetID) ON DELETE CASCADE,
+            FOREIGN KEY (eventID) REFERENCES tblevent(eventID) ON DELETE CASCADE
+        );"
+    );
     $stmt->execute();
     $stmt->closeCursor();
     echo "<br>tblmeetHasEvent created";
 
 
     // Create Tbl_MeetEventHasSwimmer
-    $stmt = $conn->prepare("DROP TABLE IF EXISTS tblmeetEventHasSwimmer;
+    $stmt = $conn->prepare("DROP TABLE IF EXISTS tblmeetEventHasSwimmer;");
+    $stmt->execute();
+    $stmt->closeCursor();
 
-    CREATE TABLE tblmeetEventHasSwimmer (
-    userID INT(6),
-    meetID INT(6),
-    eventID INT(3),
-    time VARCHAR(8),
-
-    PRIMARY KEY (userID, meetID, eventID),
-    FOREIGN KEY (meetID, eventID) REFERENCES tblmeetHasEvent(meetID, eventID) ON DELETE CASCADE,
-    FOREIGN KEY (userID) REFERENCES tbluser(userID) ON DELETE CASCADE   
-    );");
-
+    $stmt = $conn->prepare(
+        "CREATE TABLE tblmeetEventHasSwimmer (
+            userID INT(6),
+            meetID INT(6),
+            eventID INT(3),
+            time VARCHAR(8),
+            
+            PRIMARY KEY (userID, meetID, eventID),
+            FOREIGN KEY (meetID, eventID) REFERENCES tblmeetHasEvent(meetID, eventID) ON DELETE CASCADE,
+            FOREIGN KEY (userID) REFERENCES tbluser(userid) ON DELETE CASCADE
+        );"
+    );
     $stmt->execute();
     $stmt->closeCursor();
     echo "<br>tblmeetEventHasSwimmer created";
