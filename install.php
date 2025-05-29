@@ -174,6 +174,7 @@ try {
         "CREATE TABLE tblmeet (
             meetID INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             meetName VARCHAR(100) NOT NULL,
+            meetDate DATE NOT NULL,
             meetInfo TEXT NOT NULL,
             external ENUM('Y', 'N')
         );"
