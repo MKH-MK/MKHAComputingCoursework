@@ -1,24 +1,21 @@
 <?php
 // Navbar, include this file with: include('navbar.php');
-// Requires Font Awesome + Bootstrap in <head> of page
 ?>
 
 <style>
-// Set background color and layout
 body {
   margin: 0;
-  background-color: #f5f5dc; background
+  background-color: #f5f5dc; /* Beige background */
   font-family: 'Avenir Next LT Pro', sans-serif;
 }
 
-// Sidebar styles
 .sidebar {
   height: 100vh;
   position: fixed;
   top: 0;
   left: 0;
   width: 220px;
-  background-color: #004F8B;
+  background-color: #004F8B; /* Royal blue */
   padding-top: 1rem;
   color: white;
   display: flex;
@@ -26,13 +23,11 @@ body {
   align-items: center;
 }
 
-// Logo style
 .sidebar img {
   width: 60px;
   margin-bottom: 0.5rem;
 }
 
-// Title text
 .sidebar h5 {
   font-size: 1.1rem;
   font-weight: bold;
@@ -40,7 +35,6 @@ body {
   line-height: 1.4;
 }
 
-// Navigation links
 .nav-link {
   color: white;
   font-size: 1rem;
@@ -49,47 +43,45 @@ body {
   text-decoration: none;
 }
 
-// Hover effect: yellow + bold
 .nav-link:hover {
-  color: #FFD700; // Gold hover
+  color: #FFD700; /* Gold hover */
   font-weight: bold;
 }
 
-// Push login/account to bottom
 .nav-bottom {
   margin-top: auto;
 }
 
-// Icon spacing
 .nav-icon {
   margin-right: 8px;
 }
 
-// Main page content
 .main-content {
-  margin-left: 220px; // Matches sidebar width
+  margin-left: 220px; /* Matches sidebar width */
   padding: 2rem;
 }
 </style>
 
 <!-- Sidebar navigation -->
 <div class="sidebar">
-  // School logo
+
+  <!-- School logo -->
   <img src="images/oundle_logo.png" alt="Oundle School Logo">
 
-  // Title
+  <!-- Title -->
   <h5>Oundle School<br>Swim Team</h5>
 
-  // Navigation links
+  <!-- Navigation links -->
   <nav class="nav flex-column mt-4 d-flex w-100">
-    <a class="nav-link" href="/index.php"><i class="fas fa-home nav-icon"></i>Homepage</a>
-    <a class="nav-link" href="/about.php"><i class="fas fa-info-circle nav-icon"></i>About Us</a>
-    <a class="nav-link" href="/tools.php"><i class="fas fa-wrench nav-icon"></i>Tools</a>
-
-    // Login and Account pushed to bottom
+    <a class="nav-link" href="homepage.php"><i class="fas fa-home nav-icon"></i>Homepage</a>
+    <a class="nav-link" href="about.php"><i class="fas fa-info-circle nav-icon"></i>About Us</a>
+    <a class="nav-link" href="tools.php"><i class="fas fa-wrench nav-icon"></i>Tools</a>
+    
     <div class="nav-bottom">
-      <a class="nav-link" href="/login.php"><i class="fas fa-sign-in-alt nav-icon"></i>Login</a>
-      <a class="nav-link" href="/account.php"><i class="fas fa-user nav-icon"></i>Account</a>
+      <a class="nav-link" href="login.php"><i class="fas fa-sign-in-alt nav-icon"></i>Login</a>
+      <a class="nav-link" href="account.php"><i class="fas fa-user nav-icon"></i>Account</a>
     </div>
+
   </nav>
+
 </div>
