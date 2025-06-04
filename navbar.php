@@ -8,20 +8,25 @@ $navItems = [
     ],
     [
         "link" => "-",
+        "icon" => '<i class="fas fa-swimmer"></i>',
+        "label" => "Meets"
+    ],
+    [
+        "link" => "-",
         "icon" => '<i class="fas fa-trophy"></i>',
-        "label" => "Results"
+        "label" => "Records"
     ],
     [
         "link" => "-",
         "icon" => '<i class="fas fa-wrench"></i>',
         "label" => "Tools"
-    ],
+    ]
 ];
 ?>
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
 
-<!-- Navbar syyling, basically the CSS -->
+<!-- Navbar CSS -->
 <style>
 
 body {
@@ -47,7 +52,7 @@ body {
 /* Oundle School logo */
 .navbar-logo {
     display: block;
-    margin: 28px auto 12px auto;
+    margin: 16px auto 8px auto;
     max-width: 90px;
     max-height: 90px;
     border-radius: 16px;
@@ -60,9 +65,10 @@ body {
 .navbar-header {
     font-family: 'Arial Rounded MT Bold', Arial, sans-serif;
     color: #FFD700;
-    font-size: 2.0rem;
-    text-align: left;
-    padding: 32px 0 24px 0;
+    font-size: 1.65rem;
+    font-weight: bold;
+    text-align: center;
+    padding: 8px 0 12px 0;
     letter-spacing: 0.05rem;
 }
 
@@ -77,15 +83,15 @@ body {
 }
 
 .navbar-menu li {
-    margin: 28px 0;
+    margin: 8px 0;
 }
 
 .navbar-menu a {
     display: flex;
-    align-items: center;
+    align-items: left;
     color: #fff;
     text-decoration: none;
-    font-size: 1.2rem;
+    font-size: 1.1rem;
     padding: 10px 28px;
     transition: color 0.2s, font-weight 0.2s;
     border-radius: 6px 0 0 6px;
@@ -100,8 +106,8 @@ body {
 }
 
 .navbar-menu i {
-    margin-right: 15px;
-    font-size: 1.3em;
+    margin-right: 12px;
+    font-size: 1.4em;
 }
 
 .navbar-bottom {
@@ -162,6 +168,7 @@ body {
 <nav class="navbar">
     <div>
 
+        <!-- All images stored in a file called images in the root -->
         <img src="images/oundle-logo1.png" alt="Oundle School Logo" class="navbar-logo">
 
         <div class="navbar-header">
