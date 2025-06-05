@@ -1,0 +1,53 @@
+.main-content {
+    padding: 120px 5vw 24px 5vw;
+    min-height: 100vh;
+    background: #fff;
+    font-family: 'Avenir Next LT Pro', Arial, sans-serif;
+    color: #222;
+    box-sizing: border-box;
+}
+
+@media (max-width: 800px) {
+.main-content {
+    padding: 100px 4vw 12px 4vw;  /* Slightly smaller top padding on mobile */
+    }
+}
+
+.page-title {
+    font-family: 'Arial Rounded MT Bold', Arial, sans-serif;
+    font-size: 2.2rem;
+    color: #004F8B;
+    letter-spacing: 0.06rem;
+    margin-bottom: 18px;
+}
+
+.section {
+    background:rgba(0, 46, 99, 0.2);
+    border-radius: 12px;
+    box-shadow: 0 2px 12px #004f8b17;
+    padding: 32px;
+    margin-bottom: 32px;
+    min-height: 180px;
+}
+
+.section h2 {
+    color: #004F8B;
+    font-family: 'Arial Rounded MT Bold', Arial, sans-serif;
+    margin-bottom: 10px;
+    font-size: 1.4rem;
+}
+
+.section p {
+    font-family: 'Avenir Next LT Pro', Arial, sans-serif;
+    letter-spacing: 0.01rem;
+    font-size: 1.08rem;
+    color: #333;
+    line-height: 1.6;
+}
+
+@media (max-width: 800px) {
+    .main-content {
+        margin-left: 70px;
+        padding: 28px 2vw 12px 2vw;
+    }
+}

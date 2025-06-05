@@ -2,7 +2,7 @@
 // Subpages on navbar 
 $navItems = [
     [
-        "link" => "homepage.php",
+        "link" => "index.php",
         "icon" => '<i class="fas fa-home"></i>',
         "label" => "Home"
     ],
@@ -31,8 +31,16 @@ $navItems = [
 
 body {
     margin: 0;
-    background: #F5F5DC;
+    background: #fff;
     font-family: 'Avenir Next LT Pro', Arial, sans-serif;
+}
+
+/* Navbar rule that makes the left logo + title + menu use flex layout  */
+.navbar > div:first-child {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex: 1;
 }
 
 /* Navbar characterisitcs in terms of colour and positioning, as in solution description  */
@@ -40,36 +48,39 @@ body {
     position: fixed;
     top: 0;
     left: 0;
-    width: 230px;
-    height: 100vh;
-    background: #004F8B;    
+    width: 100%;
+    height: 100px;
+    background: #002f63;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    align-items: center;
     justify-content: space-between;
+    padding: 0 20px;
     z-index: 1000;
 }
 
 /* Oundle School logo */
 .navbar-logo {
     display: block;
-    margin: 16px auto 8px auto;
-    max-width: 90px;
-    max-height: 90px;
-    border-radius: 16px;
-    background: #fff;
-    padding: 6px;
-    box-shadow: 0 2px 8px #004f8b22;
+    width: 85px;
+    height: auto;
+    background: transparent;
+    pointer-events: none;
+    border-radius: 0;
 }
 
 /* Title on navbar */
 .navbar-header {
     font-family: 'Arial Rounded MT Bold', Arial, sans-serif;
     color: #FFD700;
-    font-size: 1.65rem;
+    font-size: 1.5rem;
     font-weight: bold;
-    text-align: center;
-    padding: 8px 0 12px 0;
+    padding: 0;
+    text-align: left;
     letter-spacing: 0.05rem;
+    max-width: 200px;      
+    white-space: normal;
+    line-height: 1.2; 
 }
 
 .navbar-menu {
@@ -78,23 +89,27 @@ body {
 
 .navbar-menu ul {
     list-style: none;
+    list-style: none;
     padding: 0;
     margin: 0;
+    display: flex;
+    flex-direction: row;
+    gap: 20px;
 }
 
 .navbar-menu li {
-    margin: 8px 0;
+    margin: 0;
 }
 
 .navbar-menu a {
     display: flex;
-    align-items: left;
+    display: flex;
+    align-items: center;
     color: #fff;
     text-decoration: none;
     font-size: 1.1rem;
-    padding: 10px 28px;
-    transition: color 0.2s, font-weight 0.2s;
-    border-radius: 6px 0 0 6px;
+    padding: 10px 14px;
+    border-radius: 6px;
     font-family: 'Arial Rounded MT Bold', Arial, sans-serif;
     letter-spacing: 0.03rem;
 }
@@ -111,21 +126,25 @@ body {
 }
 
 .navbar-bottom {
-    margin-bottom: 28px;
-    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding-right: 25px;
+    margin-right: 10px;
 }
 
 .navbar-bottom .welcome {
     color: #FFD700;
     font-family: 'Arial Rounded MT Bold', Arial, sans-serif;
     font-size: 1.05rem;
-    margin-bottom: 10px;
+    margin-bottom: 15px;
 }
 
 .navbar-bottom .account-links {
     display: flex;
-    flex-direction: column;
-    gap: 10px;
+    flex-direction: row;
+    gap: 14px;
+    align-items: center;
 }
 
 .navbar-bottom .account-links a,
@@ -150,16 +169,21 @@ body {
 
 @media (max-width: 800px) {
     .navbar {
-        width: 70px;
+        flex-direction: column;
+        height: auto;
+        padding: 10px;
+        align-items: flex-start;
     }
-    .navbar-header,
-    .navbar-menu a span,
-    .navbar-bottom .welcome {
-        display: none;
+
+    .navbar-menu ul {
+        flex-direction: column;
+        gap: 10px;
     }
-    .navbar-menu a, .navbar-menu i {
-        justify-content: center;
-        margin: 0 auto;
+
+    .navbar-bottom {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
     }
 }
 </style>
@@ -169,11 +193,9 @@ body {
     <div>
 
         <!-- All images stored in a file called images in the root -->
-        <img src="images/oundle-logo1.png" alt="Oundle School Logo" class="navbar-logo">
+        <img src="images/OundleLogoWHITE.png" alt="Oundle School Logo" class="navbar-logo">
 
-        <div class="navbar-header">
-            Oundle School Swimming Team
-        </div>
+        <div class="navbar-header">Oundle School Swimming Team</div>
 
         <div class="navbar-menu">
             <ul>
