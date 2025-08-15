@@ -1,6 +1,6 @@
 <?php
 session_start();
-// Example: $_SESSION['username'] = 'JohnDoe'; // Uncomment for demo
+// Example: $_SESSION['username'] = 'JohnDoe';
 ?>
 
 <!DOCTYPE html>

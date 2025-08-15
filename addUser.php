@@ -2,6 +2,24 @@
 
 include_once("connection.php");
 
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Oundle School Swim Team - Homepage</title>
+    <meta name="viewport" content="width=1024, initial-scale=1">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<?php 
+
+include 'navbar.php';
+
 try {
     $_POST = array_map("htmlspecialchars", $_POST);
 

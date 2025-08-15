@@ -1,5 +1,5 @@
 <?php
-// Subpages on navbar 
+// Subpages for subnav
 $navItems = [
     [
         "link" => "index.php",
@@ -7,26 +7,32 @@ $navItems = [
         "label" => "Home"
     ],
     [
-        "link" => "-",
+        "link" => "meets.php",
         "icon" => '<i class="fas fa-swimmer"></i>',
         "label" => "Meets"
     ],
     [
-        "link" => "-",
+        "link" => "swimmers.php",
+        "icon" => '<i class="fas fa-user"></i>',
+        "label" => "Swimmers"
+    ], 
+    [
+        "link" => "records.php",
         "icon" => '<i class="fas fa-trophy"></i>',
         "label" => "Records"
     ],
     [
-        "link" => "-",
+        "link" => "tools.php",
         "icon" => '<i class="fas fa-wrench"></i>',
         "label" => "Tools"
-    ]
+    ] 
 ];
 ?>
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
 
 <!-- Navbar CSS -->
+
 <style>
 
 body {
@@ -35,7 +41,7 @@ body {
     font-family: 'Avenir Next LT Pro', Arial, sans-serif;
 }
 
-/* Navbar rule that makes the left logo + title + menu use flex layout  */
+/* Main Navbar */
 .navbar > div:first-child {
     display: flex;
     align-items: center;
@@ -44,6 +50,7 @@ body {
 }
 
 /* Navbar characterisitcs in terms of colour and positioning, as in solution description  */
+
 .navbar {
     position: fixed;
     top: 0;
@@ -72,57 +79,13 @@ body {
 /* Title on navbar */
 .navbar-header {
     font-family: 'Arial Rounded MT Bold', Arial, sans-serif;
-    color: #FFD700;
+    color:#FFFFFF;
     font-size: 1.5rem;
     font-weight: bold;
-    padding: 0;
-    text-align: left;
     letter-spacing: 0.05rem;
     max-width: 200px;      
     white-space: normal;
     line-height: 1.2; 
-}
-
-.navbar-menu {
-    flex: 1;
-}
-
-.navbar-menu ul {
-    list-style: none;
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    display: flex;
-    flex-direction: row;
-    gap: 20px;
-}
-
-.navbar-menu li {
-    margin: 0;
-}
-
-.navbar-menu a {
-    display: flex;
-    display: flex;
-    align-items: center;
-    color: #fff;
-    text-decoration: none;
-    font-size: 1.1rem;
-    padding: 10px 14px;
-    border-radius: 6px;
-    font-family: 'Arial Rounded MT Bold', Arial, sans-serif;
-    letter-spacing: 0.03rem;
-}
-
-.navbar-menu a:hover, .navbar-menu a:focus {
-    color: #FFD700;
-    font-weight: bold;
-    background: rgba(255,255,255,0.07);
-}
-
-.navbar-menu i {
-    margin-right: 12px;
-    font-size: 1.4em;
 }
 
 .navbar-bottom {
@@ -164,7 +127,54 @@ body {
 .navbar-bottom .account-links a:hover,
 .navbar-bottom .account-links form button:hover {
     color: #FFD700;
-    font-weight: bold;
+}
+
+/* Subnav Styles */
+.subnav {
+    position: sticky;
+    top: 100px; /* Just below main navbar */
+    background: #fff;
+    border-bottom: 1px solid #ccc;
+    z-index: 999;
+    width: 100%;
+}
+
+.subnav ul {
+    display: flex;
+    justify-content: center;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.subnav li {
+    display: inline-block;
+    border-right: 1px solid #ccc;
+}
+
+.subnav li:last-child {
+    border-right: none;
+}
+
+.subnav a {
+    display: flex;
+    align-items: center;
+    padding: 10px 16px;
+    color: #002f63;
+    text-decoration: none;
+    font-size: 0.95rem;
+    font-family: 'Arial Rounded MT Bold', Arial, sans-serif;
+    transition: background 0.2s, color 0.2s;
+}
+
+.subnav a i {
+    margin-right: 8px;
+    font-size: 1.2em;
+}
+
+.subnav a:hover {
+    color: #FFD700;
+    background: #f5f5f5;
 }
 
 @media (max-width: 800px) {
@@ -175,46 +185,33 @@ body {
         align-items: flex-start;
     }
 
-    .navbar-menu ul {
-        flex-direction: column;
-        gap: 10px;
-    }
-
     .navbar-bottom {
         flex-direction: column;
         align-items: flex-start;
         gap: 10px;
     }
+
+    .subnav ul {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .subnav li {
+        border-right: none;
+        width: 100%;
+    }
 }
 </style>
 
-<!-- Strucutre of navbar -->
+<!-- Main Navbar -->
 <nav class="navbar">
     <div>
-
-        <!-- All images stored in a file called images in the root -->
         <img src="images/OundleLogoWHITE.png" alt="Oundle School Logo" class="navbar-logo">
-
-        <div class="navbar-header">Oundle School Swimming Team</div>
-
-        <div class="navbar-menu">
-            <ul>
-                <?php foreach ($navItems as $item): ?>
-                    <li>
-                        <a href="<?= htmlspecialchars($item['link']) ?>">
-                            <?= $item['icon'] ?>
-                            <span><?= htmlspecialchars($item['label']) ?></span>
-                        </a>
-                    </li>
-                <?php endforeach; ?>
-            </ul>
-        </div>
-    
+        <div class="navbar-header">Swimming Team</div>
     </div>
 
     <div class="navbar-bottom">
         <?php if (isset($_SESSION['username'])): ?>
-
             <div class="welcome">
                 Welcome, <?= htmlspecialchars($_SESSION['username']) ?>!
             </div>
@@ -225,13 +222,24 @@ body {
                     <button type="submit"><i class="fas fa-sign-out-alt"></i> Logout</button>
                 </form>
             </div>
-
         <?php else: ?>
             <div class="account-links">
                 <a href="login.php"><i class="fas fa-sign-in-alt"></i> Login</a>
-                <a href="signup.php"><i class="fas fa-user-plus"></i> Sign Up</a>
             </div>
         <?php endif; ?>
-
     </div>
 </nav>
+
+<!-- Sub Navigation Bar -->
+<div class="subnav">
+    <ul>
+        <?php foreach ($navItems as $item): ?>
+            <li>
+                <a href="<?= htmlspecialchars($item['link']) ?>">
+                    <?= $item['icon'] ?>
+                    <span><?= htmlspecialchars($item['label']) ?></span>
+                </a>
+            </li>
+        <?php endforeach; ?>
+    </ul>
+</div>
