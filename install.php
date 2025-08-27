@@ -55,36 +55,6 @@ try {
 
     // Prefill events for Tbl_Event
     $insert_sql = "INSERT INTO tblevent (eventName, course, gender) VALUES
-    
-    ('Freestyle 50m', 'L', 'M'),
-    ('Freestyle 50m', 'L', 'F'),
-    ('Freestyle 50m', 'S', 'M'),
-    ('Freestyle 50m', 'S', 'F'),
-
-    ('Freestyle 100m', 'L', 'M'),
-    ('Freestyle 100m', 'L', 'F'),
-    ('Freestyle 100m', 'S', 'M'),
-    ('Freestyle 100m', 'S', 'F'),
-
-    ('Freestyle 200m', 'L', 'M'),
-    ('Freestyle 200m', 'L', 'F'),
-    ('Freestyle 200m', 'S', 'M'),
-    ('Freestyle 200m', 'S', 'F'),
-
-    ('Freestyle 400m', 'L', 'M'),
-    ('Freestyle 400m', 'L', 'F'),
-    ('Freestyle 400m', 'S', 'M'),
-    ('Freestyle 400m', 'S', 'F'),
-
-    ('Freestyle 800m', 'L', 'M'),
-    ('Freestyle 800m', 'L', 'F'),
-    ('Freestyle 800m', 'S', 'M'),
-    ('Freestyle 800m', 'S', 'F'),
-
-    ('Freestyle 1500m', 'L', 'M'),
-    ('Freestyle 1500m', 'L', 'F'),
-    ('Freestyle 1500m', 'S', 'M'),
-    ('Freestyle 1500m', 'S', 'F'),
 
     ('Backstroke 50m', 'L', 'M'),
     ('Backstroke 50m', 'L', 'F'),
@@ -130,6 +100,36 @@ try {
     ('Fly 200m', 'L', 'F'),
     ('Fly 200m', 'S', 'M'),
     ('Fly 200m', 'S', 'F'),
+
+    ('Freestyle 50m', 'L', 'M'),
+    ('Freestyle 50m', 'L', 'F'),
+    ('Freestyle 50m', 'S', 'M'),
+    ('Freestyle 50m', 'S', 'F'),
+
+    ('Freestyle 100m', 'L', 'M'),
+    ('Freestyle 100m', 'L', 'F'),
+    ('Freestyle 100m', 'S', 'M'),
+    ('Freestyle 100m', 'S', 'F'),
+
+    ('Freestyle 200m', 'L', 'M'),
+    ('Freestyle 200m', 'L', 'F'),
+    ('Freestyle 200m', 'S', 'M'),
+    ('Freestyle 200m', 'S', 'F'),
+
+    ('Freestyle 400m', 'L', 'M'),
+    ('Freestyle 400m', 'L', 'F'),
+    ('Freestyle 400m', 'S', 'M'),
+    ('Freestyle 400m', 'S', 'F'),
+
+    ('Freestyle 800m', 'L', 'M'),
+    ('Freestyle 800m', 'L', 'F'),
+    ('Freestyle 800m', 'S', 'M'),
+    ('Freestyle 800m', 'S', 'F'),
+
+    ('Freestyle 1500m', 'L', 'M'),
+    ('Freestyle 1500m', 'L', 'F'),
+    ('Freestyle 1500m', 'S', 'M'),
+    ('Freestyle 1500m', 'S', 'F'),
 
     ('IM 100m', 'L', 'M'),
     ('IM 100m', 'L', 'F'),

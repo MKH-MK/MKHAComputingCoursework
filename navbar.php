@@ -25,7 +25,12 @@ $navItems = [
         "link" => "tools.php",
         "icon" => '<i class="fas fa-wrench"></i>',
         "label" => "Tools"
-    ] 
+    ],
+    [
+        "link" => "admin.php",
+        "icon" => '<i class="fa fa-lock" aria-hidden="true"></i>',
+        "label" => "Admin"
+    ]
 ];
 ?>
 
