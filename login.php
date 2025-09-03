@@ -26,8 +26,12 @@ session_start();
             </form>
             <a class="link-secondary" href="forgot_password.php">Forgot password?</a>
             <div class="extra-section">
-                Don't have an account?
-                <a href="signup.php">Sign up</a>
+                A Swim Team member and don't have an account?
+                <br>
+                <a href="swimmerSignup.php">Sign up as a swimmer</a>
+                <br>
+                <br>
+                Staff members are kindly asked to contact the Head of Swimming to be registered
             </div>
         </div>
     </div>

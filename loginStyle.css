@@ -20,8 +20,23 @@
     width: 100%;
 }
 
+.form-row {
+    display: flex;
+    gap: 1rem;
+    width: 100%;
+    margin-bottom: 1rem;
+}
+
+.form-row input,
+.form-row select {
+    width: 100%;
+}
+
 .form-section input[type="text"],
-.form-section input[type="password"] {
+.form-section input[type="password"],
+.form-section input[type="email"],
+.form-section input[type="number"],
+.form-section select {
     width: 100%;
     padding: 0.65rem 0.8rem;
     border: 1px solid #bbb;
@@ -30,6 +45,14 @@
     font-size: 1rem;
     font-family: inherit;
     background: #f4f7fa;
+    box-sizing: border-box;
+}
+
+.form-section select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background: #f4f7fa url('data:image/svg+xml;utf8,<svg fill="gray" height="18" viewBox="0 0 24 24" width="18" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>') no-repeat right 0.8em center/1em auto;
 }
 
 .form-section button[type="submit"] {
@@ -80,11 +103,36 @@
     text-decoration: underline;
 }
 
+.form-row {
+    display: flex;
+    gap: 1rem;
+    width: 100%;
+    margin-bottom: 1rem;
+    justify-content: center;
+}
+
+.form-row .input-small {
+    max-width: 130px;
+    min-width: 0;
+    flex: 1 1 0;
+}
+
+@media (max-width: 600px) {
+    .form-row {
+        flex-direction: column;
+        gap: 0;
+    }
+}
+
 /* Responsive max-width for mobile */
 @media (max-width: 600px) {
     .form-section {
         padding: 1.1rem 0.5rem;
         max-width: 98vw;
+    }
+    .form-row {
+        flex-direction: column;
+        gap: 0;
     }
 }
 
