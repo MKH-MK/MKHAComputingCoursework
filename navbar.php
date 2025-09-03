@@ -43,7 +43,7 @@ $navItems = [
 body {
     margin: 0;
     background: #fff;
-    font-family: 'Arial Rounded MT Bold', Arial, sans-serif;
+    font-family: "Avenir Next LT Pro", Avenir, sans-serif;
 }
 
 /* Main Navbar */

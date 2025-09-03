@@ -1,0 +1,94 @@
+.form-section {
+    max-width: 370px;
+    margin: 60px auto 0 auto;
+    padding: 2rem 2.2rem 1.5rem 2.2rem;
+    background: #fff;
+    border-radius: 18px;
+    box-shadow: 0 2px 12px #004f8b67;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.form-section h2 {
+    margin-bottom: 1.2rem;
+    color: #002f63;
+    font-family: 'Arial Rounded MT Bold', Arial, sans-serif;
+}
+
+.form-section form {
+    width: 100%;
+}
+
+.form-section input[type="text"],
+.form-section input[type="password"] {
+    width: 100%;
+    padding: 0.65rem 0.8rem;
+    border: 1px solid #bbb;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    font-size: 1rem;
+    font-family: inherit;
+    background: #f4f7fa;
+}
+
+.form-section button[type="submit"] {
+    width: 100%;
+    padding: 0.65rem;
+    background: #004F8B;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 1rem;
+    cursor: pointer;
+    margin-bottom: 0.5rem;
+    font-family: 'Arial Rounded MT Bold', Arial, sans-serif;
+    transition: background 0.2s;
+}
+
+.form-section button[type="submit"]:hover {
+    background: #00335d;
+}
+
+.form-section .link-secondary {
+    color: #0074d9;
+    text-decoration: none;
+    font-size: 0.97rem;
+    display: block;
+    margin-bottom: 1.4rem;
+    text-align: right;
+    transition: text-decoration 0.2s;
+}
+
+.form-section .link-secondary:hover {
+    text-decoration: underline;
+}
+
+.form-section .extra-section {
+    margin-top: 1.2rem;
+    font-size: 0.97rem;
+    text-align: center;
+}
+
+.form-section .extra-section a {
+    color: #0074d9;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.form-section .extra-section a:hover {
+    text-decoration: underline;
+}
+
+/* Responsive max-width for mobile */
+@media (max-width: 600px) {
+    .form-section {
+        padding: 1.1rem 0.5rem;
+        max-width: 98vw;
+    }
+}
+
+/* Adjust for navbar fixed height */
+body {
+    padding-top: 100px;
+}
