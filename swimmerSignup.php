@@ -14,12 +14,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             throw new Exception("Invalid email format.");
         }
 
-        if (substr($email, -21) !== "@oundleschool.org.uk") {
+        if (substr($email, -20) !== "@oundleschool.org.uk") {
             throw new Exception("Email must be a valid school email address ending in @oundleschool.org.uk.");
         }
 
         if (substr_count($email, '@') !== 1) {
-            throw new Exception("Invalid email: multiple @ symbols found.");
+            throw new Exception("Invalid school email syntax: multiple @ symbols found.");
         }
 
         // Validate passwords
@@ -34,7 +34,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         $role = 0;
 
-        $Username = substr($email, 0, strpos($email, '@'));
+        $userName = substr($email, 0, strpos($email, '@'));
         $hashed_password = password_hash($_POST["passwd"], PASSWORD_DEFAULT);
 
         $stmt = $conn->prepare("INSERT INTO tbluser 
@@ -47,7 +47,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $stmt->bindParam(':forename', $_POST["forename"]);
         $stmt->bindParam(':yearg', $_POST["yearg"], PDO::PARAM_INT);  
         $stmt->bindParam(':emailAddress', $email);  
-        $stmt->bindParam(':userName', $Username); 
+        $stmt->bindParam(':userName', $userName); 
         $stmt->bindParam(':gender', $_POST["gender"]);
         $stmt->bindParam(':description', $_POST["description"]);
 
@@ -90,7 +90,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 <div class="alert alert-danger text-center"><?= $error_message ?></div>
             <?php endif; ?>
 
-            <form action="signup.php" method="post" autocomplete="off">
+            <br>
+
+            <form action="swimmerSignup.php" method="post" autocomplete="off">
                 <div class="form-row">
                     <input type="text" name="forename" placeholder="Forename" required>
                     <input type="text" name="surname" placeholder="Surname" required>

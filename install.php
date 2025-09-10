@@ -29,7 +29,7 @@ try {
             yearg INT(2) NOT NULL,
             emailAddress VARCHAR(100) NOT NULL,
             userName VARCHAR(25) NOT NULL,
-            gender ENUM('M', 'F') NOT NULL,
+            gender ENUM('M', 'F', 'MIX') NOT NULL,
             description TEXT NOT NULL
         );"
     );
@@ -210,32 +210,12 @@ try {
 
             PRIMARY KEY (userID, meetID, eventID),
             FOREIGN KEY (meetID, eventID) REFERENCES tblmeetHasEvent(meetID, eventID) ON DELETE CASCADE,
-            FOREIGN KEY (userID) REFERENCES tbluser(userid) ON DELETE CASCADE
+            FOREIGN KEY (userID) REFERENCES tbluser(userID) ON DELETE CASCADE
         );"
     );
     $stmt->execute();
     $stmt->closeCursor();
     echo "<br>tblmeetEventHasSwimmer created";
-
-
-    $hashed_password = password_hash("Mark123", PASSWORD_DEFAULT);
-    $stmt = $conn->prepare(
-        "INSERT INTO tbluser (passwd, role, surname, forename, yearg, emailAddress, userName, gender, description)
-         VALUES (:passwd, :role, :surname, :forename, :yearg, :emailAddress, :userName, :gender, :description)"
-    );
-    
-    $stmt->execute([
-        ':passwd' => $hashed_password,
-        ':role' => 2,
-        ':surname' => 'Khametov',
-        ':forename' => 'Mark',
-        ':yearg' => 12,
-        ':emailAddress' => 'khametov.m@oundleschool.org.uk',
-        ':userName' => 'Mark123',
-        ':gender' => 'M',
-        ':description' => 'I love testing, testing, testing'
-    ]);
-    $stmt->closeCursor();
 
     echo "<br>Database created successfully";
 

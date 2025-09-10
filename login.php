@@ -6,12 +6,12 @@
     if ($_SERVER["REQUEST_METHOD"]=="POST"){
 
         // Binds data
-        $username=$_POST["userName"];
+        $userName=$_POST["userName"];
         $password=$_POST["passwd"];
 
         // Find locate the username
-        $stmt=$conn->prepare("SELECT * FROM tbl_User WHERE userName=:userName LIMIT 1");
-        $stmt->bindParam(":userName",$username);
+        $stmt=$conn->prepare("SELECT * FROM tbluser WHERE userName=:userName LIMIT 1");
+        $stmt->bindParam(":userName",$userName);
         $stmt->execute();
 
         // Fetch the user row if a match is found
