@@ -9,12 +9,15 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         // Validate email
         $email = trim($_POST["email"]);
+
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             throw new Exception("Invalid email format.");
         }
+
         if (substr($email, -21) !== "@oundleschool.org.uk") {
             throw new Exception("Email must be a valid school email address ending in @oundleschool.org.uk.");
         }
+
         if (substr_count($email, '@') !== 1) {
             throw new Exception("Invalid email: multiple @ symbols found.");
         }
@@ -22,6 +25,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         // Validate passwords
         if ($_POST["passwd"] !== $_POST["confirm_passwd"]) {
             throw new Exception("Passwords do not match.");
+        }
+        
+        $description = isset($_POST["description"]) ? $_POST["description"] : "";
+        if (strlen($description) > 400) {
+            throw new Exception("Description cannot exceed 400 characters.");
         }
 
         $role = 0;
@@ -104,7 +112,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
                 <input type="password" name="passwd" placeholder="Password" required autocomplete="new-password">
                 <input type="password" name="confirm_passwd" placeholder="Confirm Password" required autocomplete="new-password">
-                <input type="text" name="description" placeholder="Description (optional)">
+                <input type="text" name="description" placeholder="Description (optional & 400 characters max)" maxlength="400">
                 <button type="submit">Sign Up</button>
             </form>
             <div class="extra-section">
