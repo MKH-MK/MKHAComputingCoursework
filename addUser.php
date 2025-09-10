@@ -36,7 +36,7 @@ try {
 
     // Check only one email input
     if (substr_count($email, '@') !== 1) {
-        throw new Exception("Invalid email: multiple @ symbols found.");
+        throw new Exception("Invalid email syntax: multiple @ symbols found.");
     }
 
     echo($_POST["forename"]);
