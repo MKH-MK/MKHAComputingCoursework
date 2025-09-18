@@ -105,7 +105,8 @@ body {
     color: #FFD700;
     font-family: 'Arial Rounded MT Bold', Arial, sans-serif;
     font-size: 1.05rem;
-    margin-bottom: 15px;
+    margin: 0; 
+    align-self: center; 
 }
 
 .navbar-bottom .account-links {
@@ -216,9 +217,9 @@ body {
     </div>
 
     <div class="navbar-bottom">
-        <?php if (isset($_SESSION['username'])): ?>
+        <?php if (isset($_SESSION['userName'])): ?>
             <div class="welcome">
-                Welcome, <?= htmlspecialchars($_SESSION['username']) ?>!
+                Welcome, <?= htmlspecialchars($_SESSION['userName']) ?>!
             </div>
 
             <div class="account-links">

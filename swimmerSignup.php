@@ -120,6 +120,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <div class="extra-section">
                 Already have an account?
                 <a href="login.php">Login</a>
+                <br>
+                <br>
+                Staff members are kindly asked to contact the Head of Swimming to be registered
             </div>
         <?php endif; ?>
     </div>

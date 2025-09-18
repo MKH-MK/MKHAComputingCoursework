@@ -117,6 +117,26 @@
     flex: 1 1 0;
 }
 
+.success-message {
+    background: #d4edda;
+    color: #155724;
+    padding: 0.8rem 1.1rem;
+    border-radius: 5px;
+    font-size: 1.01rem;
+    border: 1px solid #c3e6cb;
+    text-align: center;
+}
+
+.failed-message {
+    background: #ff00006b;
+    color: #000000;
+    padding: 0.8rem 1.1rem;
+    border-radius: 5px;
+    font-size: 1.01rem;
+    border: 1px solid #ff000071;
+    text-align: center;
+}
+
 @media (max-width: 600px) {
     .form-row {
         flex-direction: column;

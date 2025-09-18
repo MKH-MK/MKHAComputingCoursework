@@ -17,12 +17,12 @@
         // Fetch the user row if a match is found
         $user=$stmt->fetch(PDO::FETCH_ASSOC);
 
-        // compares the password entered and the hashed password stored in the DB by using password_verify
+        // Compares the password entered and the hashed password stored in the DB by using password_verify
         if ($user && password_verify($password, $user["passwd"])){
-            // uses the session superglobal to store data about if the user is logged in, which can be accessed on other pages
+            // Uses the session superglobal to store data about if the user is logged in, which can be accessed on other pages
             $_SESSION["logged_in"]=true;
             $_SESSION["userName"]=$user["userName"];
-            $_SESSION["role"]="0";
+            $_SESSION["role"] = $user["role"];
 
             header("Location: index.php");
             exit;
@@ -49,9 +49,18 @@
 
     <div class="main-content">
         <div class="form-section">
-        
+
+    <?php
+        if (isset($_GET['loggedout'])) {
+            echo '<div class="success-message">You have been successfully logged out.</div>';
+        }
+
+        if (!empty($login_error)) 
+            echo "<div class='failed-message'>$login_error</div>";
+    
+    ?>
+
             <h2>Login</h2>
-            <?php if (!empty($login_error)) echo "<p style='color:red;'>$login_error</p>"; ?>
 
             <form action="login.php" method="post">
                 <input type="text" name="userName" placeholder="Username" required autocomplete="username">
@@ -64,9 +73,6 @@
                 A Swim Team member and don't have an account?
                 <br>
                 <a href="swimmerSignup.php">Sign up as a swimmer</a>
-                <br>
-                <br>
-                Staff members are kindly asked to contact the Head of Swimming to be registered
             </div>
         
         </div>
