@@ -52,11 +52,11 @@
 
     <?php
         if (isset($_GET['loggedout'])) {
-            echo '<div class="success-message">You have been successfully logged out.</div>';
+            echo '<div class="alert-success">You have been successfully logged out.</div>';
         }
 
         if (!empty($login_error)) 
-            echo "<div class='failed-message'>$login_error</div>";
+            echo "<div class='alert-fail'>$login_error</div>";
     
     ?>
 

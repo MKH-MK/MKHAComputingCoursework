@@ -15,11 +15,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         }
 
         if (substr($email, -20) !== "@oundleschool.org.uk") {
-            throw new Exception("Email must be a valid school email address ending in @oundleschool.org.uk.");
+            throw new Exception("Email must be a valid school email address");
         }
 
         if (substr_count($email, '@') !== 1) {
-            throw new Exception("Invalid school email syntax: multiple @ symbols found.");
+            throw new Exception("Invalid email format");
         }
 
         // Validate passwords
@@ -36,6 +36,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         $userName = substr($email, 0, strpos($email, '@'));
         $hashed_password = password_hash($_POST["passwd"], PASSWORD_DEFAULT);
+
+        // Check if email already exists
+        $email_check = $conn->prepare("SELECT COUNT(*) FROM tbluser WHERE emailAddress = :email");
+        $email_check->bindParam(':email', $email);
+        $email_check->execute();
+        if ($email_check->fetchColumn() > 0) {
+            throw new Exception("An account already exists with this email.");
+        }
 
         $stmt = $conn->prepare("INSERT INTO tbluser 
             (userID, passwd, role, surname, forename, yearg, emailAddress, userName, gender, description)
@@ -57,7 +65,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     } catch (PDOException $e) {
         $error_message = "Database Error: " . $e->getMessage();
     } catch (Exception $e) {
-        $error_message = "Validation Error: " . $e->getMessage();
+        $error_message = $e->getMessage();
     }
     $conn = null;
 }
@@ -80,18 +88,17 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     <div class="form-section">
         <h2>Swimmer Sign Up</h2>
 
+        <?php if (!empty($error_message)): ?>
+            <div class="alert-fail">
+                <?= htmlspecialchars($error_message) ?>
+            </div>
+        <?php endif; ?>
+
         <?php if ($registration_success): ?>
-            <div class="alert alert-success text-center">
+            <div class="alert-success">
                 Registration successful! <a href="login.php">Login here</a>
             </div>
-
         <?php else: ?>
-            <?php if (!empty($error_message)): ?>
-                <div class="alert alert-danger text-center"><?= $error_message ?></div>
-            <?php endif; ?>
-
-            <br>
-
             <form action="swimmerSignup.php" method="post" autocomplete="off">
                 <div class="form-row">
                     <input type="text" name="forename" placeholder="Forename" required>
@@ -106,9 +113,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     <input type="number" name="yearg" class="input-small" placeholder="Year Group" min="7" max="13" required>
                     <select name="gender" class="input-small" required>
                         <option value="" disabled selected>Gender</option>
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
-                        <option value="Other">Other</option>
+                        <option value="M">Male</option>
+                        <option value="F">Female</option>
+                        <option value="MIX">Other</option>
                     </select>
                 </div>
 
@@ -117,6 +124,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 <input type="text" name="description" placeholder="Description (optional & 400 characters max)" maxlength="400">
                 <button type="submit">Sign Up</button>
             </form>
+            
             <div class="extra-section">
                 Already have an account?
                 <a href="login.php">Login</a>
@@ -124,6 +132,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 <br>
                 Staff members are kindly asked to contact the Head of Swimming to be registered
             </div>
+        
         <?php endif; ?>
     </div>
 </div>
