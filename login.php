@@ -40,7 +40,7 @@
     <meta charset="UTF-8">
     <title>Oundle School Swim Team - Login</title>
     <meta name="viewport" content="width=1024, initial-scale=1">
-    <link rel="stylesheet" href="loginStyle.css">
+    <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
