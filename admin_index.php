@@ -7,7 +7,7 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] != 2) {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Admin Section - Access Denied</title>
+    <title>Oundle School Swim Team - Denied Access</title>
     <meta name="viewport" content="width=1024, initial-scale=1">
     <link rel="stylesheet" href="style.css">
 </head>
@@ -41,7 +41,7 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] != 2) {
 
 <head>
     <meta charset="UTF-8">
-    <title>Admin Section - Oundle School Swim Team</title>
+    <title>Oundle School Swim Team - Admin Index</title>
     <meta name="viewport" content="width=1024, initial-scale=1">
     <link rel="stylesheet" href="style.css">
 </head>
@@ -54,18 +54,23 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] != 2) {
         </div>
         <div class="section">
             <h2>Admin Tools</h2>
+            <p>Meet tools:</p>
             <ul>
-                <li><a href="admin_meets.php">Manage Meets</a></li>
+                <li><a href="admin_addMeets.php">Add Meets</a></li>
+                <li><a href="admin_manageMeets.php">Manage Meets</a></li>
+            </ul>
+
+            <p>Event/Result tools:</p>
+            <ul>
                 <li><a href="admin_events.php">Manage Events</a></li>
-                <li><a href="admin_swimmers.php">Manage Swimmers</a></li>
-                <li><a href="admin_results.php">Enter Results</a></li>
+                <li><a href="admin_results.php">Manage Results</a></li>
             </ul>
-        </div>
-        <div class="section">
-            <h2>Quick Links</h2>
+
+            <p>User tools:</p>
             <ul>
-                <li><a href="index.php">Back to Home</a></li>
+                <li><a href="admin_users.php">Manage Users</a></li>
             </ul>
+
         </div>
     </div>
 </body>

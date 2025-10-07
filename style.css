@@ -1,5 +1,5 @@
 .main-content {
-    padding: 120px 5vw 24px 5vw;
+    padding: 20px 5vw 24px 5vw;
     min-height: 100vh;
     background: #fff;
     font-family: 'Avenir Next LT Pro', Arial, sans-serif;
@@ -36,7 +36,7 @@
     letter-spacing: 0.01rem;
     font-size: 1.08rem;
     color: #333;
-    line-height: 1.6;
+    line-height: 1.0;
 }
 .form-section {
     max-width: 370px;

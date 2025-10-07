@@ -27,7 +27,7 @@ $navItems = [
         "label" => "Tools"
     ],
     [
-        "link" => "admin.php",
+        "link" => "admin_index.php",
         "icon" => '<i class="fa fa-lock" aria-hidden="true"></i>',
         "label" => "Admin"
     ]
