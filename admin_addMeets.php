@@ -91,10 +91,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         <?php if ($creation_success): ?>
             <div class="alert-success">
-                Meet created successful! <a href="admin_manageMeet.php">Manage the meet here</a>
+                Meet created successful! <a href="admin_manageMeets.php">Manage the meet here</a>
             </div>
         <?php else: ?>
-            <form action="admin_addMeet.php" method="post" autocomplete="off">
+            <form action="admin_addMeets.php" method="post" autocomplete="off">
                 <div class="form-row">
                     <input type="text" name="meetName" placeholder="Name of Meet" required>
                 </div>
@@ -105,11 +105,15 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     <input type="date" name="meetDate" required>
                 </div>
 
+                <br>
+                <p>Is this meet in school:</p>
+
                 <div class="form-row">
                     <select name="external" class="input" required>
-                        <option value="" disabled selected>Is this a school run meet</option>
+
                         <option value="N">Yes</option>
                         <option value="Y">No</option>
+
                     </select>
                 </div>
 
