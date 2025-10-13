@@ -176,7 +176,7 @@ try {
             meetName VARCHAR(100) NOT NULL,
             meetDate DATE NOT NULL,
             meetInfo TEXT NOT NULL,
-            external ENUM('Y', 'N')
+            external ENUM('Y', 'N') # Can only be Y or N
         );"
     );
     $stmt->execute();

@@ -49,10 +49,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             VALUES (null, :meetName, :meetDate, :meetInfo, :external)");
 
 
-        $stmt->bindParam(':meetName', $_POST["surname"]);
-        $stmt->bindParam(':meetDate', $_POST["forename"]);
-        $stmt->bindParam(':meetInfo', $_POST["yearg"], PDO::PARAM_INT);  
-        $stmt->bindParam(':external', $email);  
+        $stmt->bindParam(':meetName', $_POST["meetName"]);
+        $stmt->bindParam(':meetDate', $_POST["meetDate"]);
+        $stmt->bindParam(':meetInfo', $_POST["meetInfo"]);  
+        $stmt->bindParam(':external', $_POST["external"]);  
 
         $stmt->execute();
 
@@ -99,14 +99,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     <input type="text" name="meetName" placeholder="Name of Meet" required>
                 </div>
                 
-                <p>Date of Meet:</p>
+                <h3>Date of Meet:</h3>
 
                 <div class="form-row">
                     <input type="date" name="meetDate" required>
                 </div>
 
-                <br>
-                <p>Is this meet in school:</p>
+                <h3>Is this meet in school:</h3>
 
                 <div class="form-row">
                     <select name="external" class="input" required>

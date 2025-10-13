@@ -109,7 +109,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     <input type="email" name="email" placeholder="School Email" required autocomplete="email">
                 </div>
 
-                <div class="form-row">
+                <div class="form-row form-row--center">
                     <input type="number" name="yearg" class="input-small" placeholder="Year Group" min="7" max="13" required>
                     <select name="gender" class="input-small" required>
                         <option value="" disabled selected>Gender</option>
