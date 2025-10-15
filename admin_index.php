@@ -62,13 +62,15 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] != 2) {
 
             <p>Event/Result tools:</p>
             <ul>
-                <li><a href="admin_events.php">Manage Events</a></li>
-                <li><a href="admin_results.php">Manage Results</a></li>
+                <li><a href="admin_addEvents.php">add Events</a></li>
+                <li><a href="admin_manageEvents.php">Manage Events</a></li>
+                <li><a href="admin_mangeResults.php">Manage Results</a></li>
             </ul>
 
             <p>User tools:</p>
             <ul>
-                <li><a href="admin_users.php">Manage Users</a></li>
+                <li><a href="admin_addUsers.php">Add Users</a></li>
+                <li><a href="admin_manageUsers.php">Manage Users</a></li>
             </ul>
 
         </div>

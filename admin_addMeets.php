@@ -45,18 +45,22 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $_POST = array_map("htmlspecialchars", $_POST);
 
         $stmt = $conn->prepare("INSERT INTO tblmeet 
-            (meetID, meetName, meetDate, meetInfo, external)
-            VALUES (null, :meetName, :meetDate, :meetInfo, :external)");
-
+            (meetID, meetName, meetDate, meetInfo, external, course)
+            VALUES (null, :meetName, :meetDate, :meetInfo, :external, :course)");
 
         $stmt->bindParam(':meetName', $_POST["meetName"]);
         $stmt->bindParam(':meetDate', $_POST["meetDate"]);
         $stmt->bindParam(':meetInfo', $_POST["meetInfo"]);  
-        $stmt->bindParam(':external', $_POST["external"]);  
+        $stmt->bindParam(':external', $_POST["external"]);
+        $stmt->bindParam(':course', $_POST["course"]);  
 
         $stmt->execute();
 
-        $creation_success = true;
+        // SIMPLE CHANGE: redirect straight to Manage Meets with highlight instead of showing a link
+        $newMeetId = $conn->lastInsertId();
+        header("Location: admin_manageMeets.php?highlight=" . urlencode($newMeetId) . "&q=" . urlencode($newMeetId));
+        exit;
+
     } catch (PDOException $e) {
         $error_message = "Database Error: " . $e->getMessage();
     } catch (Exception $e) {
@@ -89,38 +93,35 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             </div>
         <?php endif; ?>
 
-        <?php if ($creation_success): ?>
-            <div class="alert-success">
-                Meet created successful! <a href="admin_manageMeets.php">Manage the meet here</a>
+        <form action="admin_addMeets.php" method="post" autocomplete="off">
+            <div class="form-row">
+                <input type="text" name="meetName" placeholder="Name of Meet" required>
             </div>
-        <?php else: ?>
-            <form action="admin_addMeets.php" method="post" autocomplete="off">
-                <div class="form-row">
-                    <input type="text" name="meetName" placeholder="Name of Meet" required>
-                </div>
-                
-                <h3>Date of Meet:</h3>
 
-                <div class="form-row">
-                    <input type="date" name="meetDate" required>
-                </div>
+            <h3>Course type:</h3>
+            <div class="form-row">
+                <select name="course" class="input" required>
+                    <option value="L">Longcourse</option>
+                    <option value="S">Shortcourse</option>
+                </select>
+            </div>
 
-                <h3>Is this meet in school:</h3>
+            <h3>Date of Meet:</h3>
+            <div class="form-row">
+                <input type="date" name="meetDate" required>
+            </div>
 
-                <div class="form-row">
-                    <select name="external" class="input" required>
+            <h3>Is this meet in school:</h3>
+            <div class="form-row">
+                <select name="external" class="input" required>
+                    <option value="N">Yes</option>
+                    <option value="Y">No</option>
+                </select>
+            </div>
 
-                        <option value="N">Yes</option>
-                        <option value="Y">No</option>
-
-                    </select>
-                </div>
-
-                <input type="text" name="meetInfo" placeholder="Meet description (400 characters max)" maxlength="400" required>
-                <button type="submit">Create Meet</button>
-            </form>
-        
-        <?php endif; ?>
+            <input type="text" name="meetInfo" placeholder="Meet description (400 characters max)" maxlength="400" required>
+            <button type="submit">Create Meet</button>
+        </form>
     </div>
 </div>
 </body>

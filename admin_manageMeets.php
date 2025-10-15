@@ -40,3 +40,42 @@ include_once("connection.php");
 $creation_success = false;
 $error_message = '';
 
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    try {
+        $_POST = array_map("htmlspecialchars", $_POST);
+
+        $stmt = $conn->prepare("INSERT INTO tblmeet 
+            (meetID, meetName, meetDate, meetInfo, external, course)
+            VALUES (null, :meetName, :meetDate, :meetInfo, :external, :course)");
+
+
+        $stmt->bindParam(':meetName', $_POST["meetName"]);
+        $stmt->bindParam(':meetDate', $_POST["meetDate"]);
+        $stmt->bindParam(':meetInfo', $_POST["meetInfo"]);  
+        $stmt->bindParam(':external', $_POST["external"]);
+        $stmt->bindParam(':course', $_POST["course"]);  
+
+        $stmt->execute();
+
+        $creation_success = true;
+    } catch (PDOException $e) {
+        $error_message = "Database Error: " . $e->getMessage();
+    } catch (Exception $e) {
+        $error_message = "Validation Error: " . $e->getMessage();
+    }
+    $conn = null;
+}
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Oundle School Swim Team - Admin Meet Creation</title>
+    <meta name="viewport" content="width=1024, initial-scale=1">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+<?php include 'navbar.php'; ?>

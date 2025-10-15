@@ -58,7 +58,7 @@
 
 /* CHANGE: Make h3 headers compact, smaller, and bold so they sit close to the field they describe */
 .form-section h3 {
-    margin: 0.35rem 0 0.25rem;     /* CHANGE: reduced vertical space above/below headers */
+    margin: 0.55rem 0 0.25rem;     /* CHANGE: reduced vertical space above/below headers */
     color: #000000;
     font-family: 'Arial Rounded MT Bold', Arial, sans-serif;
     font-weight: 700;               /* CHANGE: ensure bold even with fallbacks */
@@ -226,7 +226,6 @@
     text-align: center;
 }
 
-/* Adjust for navbar fixed height */
 body {
     padding-top: 100px;
 }
@@ -234,7 +233,7 @@ body {
 @media (max-width: 800px) {
     .main-content {
         margin-left: 70px;
-        padding: 28px 2vw 12px 2vw; /* Pick whichever padding you prefer */
+        padding: 28px 2vw 12px 2vw;
     }
 }
 

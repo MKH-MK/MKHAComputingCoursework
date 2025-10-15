@@ -1,4 +1,42 @@
 <?php
+
+session_start();
+if (!isset($_SESSION['role']) || $_SESSION['role'] != 2) {
+    // Show error message and do not load the admin page content
+    echo '<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Section - Access Denied</title>
+    <meta name="viewport" content="width=1024, initial-scale=1">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="main-content">
+        <div class="page-title">
+            Access Denied
+        </div>
+        <div class="section">
+            <div class="alert-fail">
+                Permision Error: You do not have the right privilege to view this page.
+            </div>
+            <h2>Further options:</h2>
+            <ul>
+                <li>If you think this is an error, please <a href="contact.php">contact the administrator</a>.
+                <li><a href="login.php">Login</a></li>
+                <li><a href="index.php">Return to Home</a></li>
+            </ul>
+        </div>
+    </div>
+</body>
+
+</html>';
+    exit();
+}
+
+<?php
 include_once("connection.php");
 $registration_success = false;
 $error_message = '';
@@ -76,7 +114,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
 <head>
     <meta charset="UTF-8">
-    <title>Oundle School Swim Team - Swimmer Sign Up</title>
+    <title>Oundle School Swim Team - Admin User Creation</title>
     <meta name="viewport" content="width=1024, initial-scale=1">
     <link rel="stylesheet" href="style.css">
 </head>
@@ -109,7 +147,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     <input type="email" name="email" placeholder="School Email" required autocomplete="email">
                 </div>
 
-                <div class="form-row">
+                <div class="form-row form-row--center">
                     <input type="number" name="yearg" class="input-small" placeholder="Year Group" min="7" max="13" required>
                     <select name="gender" class="input-small" required>
                         <option value="" disabled selected>Gender</option>
