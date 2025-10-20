@@ -1,5 +1,4 @@
 <?php
-
 session_start();
 if (!isset($_SESSION['role']) || $_SESSION['role'] != 2) {
     // Show error message and do not load the admin page content
@@ -8,7 +7,7 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] != 2) {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Admin Section - Access Denied</title>
+    <title>Oundle School Swim Team - Denied Access</title>
     <meta name="viewport" content="width=1024, initial-scale=1">
     <link rel="stylesheet" href="style.css">
 </head>
@@ -37,28 +36,27 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] != 2) {
 }
 
 include_once("connection.php");
-$creation_success = false;
 $error_message = '';
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
     try {
+        
         $_POST = array_map("htmlspecialchars", $_POST);
 
+        // Insert meet
         $stmt = $conn->prepare("INSERT INTO tblmeet 
             (meetID, meetName, meetDate, meetInfo, external, course)
             VALUES (null, :meetName, :meetDate, :meetInfo, :external, :course)");
-
         $stmt->bindParam(':meetName', $_POST["meetName"]);
         $stmt->bindParam(':meetDate', $_POST["meetDate"]);
-        $stmt->bindParam(':meetInfo', $_POST["meetInfo"]);  
+        $stmt->bindParam(':meetInfo', $_POST["meetInfo"]);
         $stmt->bindParam(':external', $_POST["external"]);
-        $stmt->bindParam(':course', $_POST["course"]);  
-
+        $stmt->bindParam(':course', $_POST["course"]);
         $stmt->execute();
 
-        // SIMPLE CHANGE: redirect straight to Manage Meets with highlight instead of showing a link
+        // Redirect: go straight into the editor view
         $newMeetId = $conn->lastInsertId();
-        header("Location: admin_manageMeets.php?highlight=" . urlencode($newMeetId) . "&q=" . urlencode($newMeetId));
+        header("Location: admin_manageMeets.php?edit=" . urlencode($newMeetId));
         exit;
 
     } catch (PDOException $e) {
@@ -111,7 +109,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 <input type="date" name="meetDate" required>
             </div>
 
-            <h3>Is this meet in school:</h3>
+            <h3>Is this meet for school?</h3>
             <div class="form-row">
                 <select name="external" class="input" required>
                     <option value="N">Yes</option>
