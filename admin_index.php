@@ -57,14 +57,13 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] != 2) {
             <p>Meet tools:</p>
             <ul>
                 <li><a href="admin_addMeets.php">Add Meets</a></li>
-                <li><a href="admin_manageMeets.php">Manage Meets</a></li>
+                <li><a href="admin_meetList.php">Manage Meets</a></li>
             </ul>
 
             <p>Event/Result tools:</p>
             <ul>
-                <li><a href="admin_addEvents.php">add Events</a></li>
-                <li><a href="admin_manageEvents.php">Manage Events</a></li>
-                <li><a href="admin_mangeResults.php">Manage Results</a></li>
+                <li><a href="admin_eventEditor.php">Manage Events</a></li>
+                <li><a href="admin_resultsList.php">Manage Results</a></li>
             </ul>
 
             <p>User tools:</p>

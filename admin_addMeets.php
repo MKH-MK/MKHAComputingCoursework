@@ -40,23 +40,37 @@ $error_message = '';
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
     try {
-        
-        $_POST = array_map("htmlspecialchars", $_POST);
+        // IMPORTANT: Do NOT HTML-escape before saving. Just trim/validate.
+        $meetName = isset($_POST["meetName"]) ? trim($_POST["meetName"]) : '';
+        $meetDate = isset($_POST["meetDate"]) ? trim($_POST["meetDate"]) : '';
+        $meetInfo = isset($_POST["meetInfo"]) ? trim($_POST["meetInfo"]) : '';
+        $external = isset($_POST["external"]) ? $_POST["external"] : 'N';
+        $course   = isset($_POST["course"]) ? $_POST["course"] : 'L';
 
-        // Insert meet
+        if ($meetName === '' || $meetDate === '') {
+            throw new Exception("Name and date are required.");
+        }
+        if (strlen($meetName) > 100) {
+            throw new Exception("Meet name cannot exceed 100 characters.");
+        }
+        if (strlen($meetInfo) > 400) {
+            throw new Exception("Description cannot exceed 400 characters.");
+        }
+
+        // Insert meet (store raw values; escape only when outputting)
         $stmt = $conn->prepare("INSERT INTO tblmeet 
             (meetID, meetName, meetDate, meetInfo, external, course)
             VALUES (null, :meetName, :meetDate, :meetInfo, :external, :course)");
-        $stmt->bindParam(':meetName', $_POST["meetName"]);
-        $stmt->bindParam(':meetDate', $_POST["meetDate"]);
-        $stmt->bindParam(':meetInfo', $_POST["meetInfo"]);
-        $stmt->bindParam(':external', $_POST["external"]);
-        $stmt->bindParam(':course', $_POST["course"]);
+        $stmt->bindParam(':meetName', $meetName);
+        $stmt->bindParam(':meetDate', $meetDate);
+        $stmt->bindParam(':meetInfo', $meetInfo);
+        $stmt->bindParam(':external', $external);
+        $stmt->bindParam(':course', $course);
         $stmt->execute();
 
         // Redirect: go straight into the editor view
         $newMeetId = $conn->lastInsertId();
-        header("Location: admin_manageMeets.php?edit=" . urlencode($newMeetId));
+        header("Location: admin_meetEditor.php?edit=" . urlencode($newMeetId));
         exit;
 
     } catch (PDOException $e) {

@@ -56,15 +56,15 @@ try {
     // Prefill events for Tbl_Event
     $insert_sql = "INSERT INTO tblevent (eventName, course, gender) VALUES
 
-     ('Backstroke 50m', 'Lc', 'M'),
-    ('Backstroke 50m', 'Lc', 'F'),
-    ('Backstroke 50m', 'Sc', 'M'),
-    ('Backstroke 50m', 'Sc', 'F'),
+     ('Backstroke 50m', 'L', 'M'),
+    ('Backstroke 50m', 'L', 'F'),
+    ('Backstroke 50m', 'S', 'M'),
+    ('Backstroke 50m', 'S', 'F'),
 
-    ('Backstroke 100m', 'Lc', 'M'),
-    ('Backstroke 100m', 'Lc', 'F'),
-    ('Backstroke 100m', 'Sc', 'M'),
-    ('Backstroke 100m', 'Sc', 'F'),
+    ('Backstroke 100m', 'L', 'M'),
+    ('Backstroke 100m', 'L', 'F'),
+    ('Backstroke 100m', 'S', 'M'),
+    ('Backstroke 100m', 'S', 'F'),
 
     ('Backstroke 200m', 'L', 'M'),
     ('Backstroke 200m', 'L', 'F'),

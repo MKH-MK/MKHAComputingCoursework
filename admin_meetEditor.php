@@ -1,362 +1,408 @@
 <?php
-/*
-  Admin - Meet Editor (HTML fragment returned to inline editor)
-  - POST target is ALWAYS this file, using an absolute path based on dirname($_SERVER['PHP_SELF'])
-  - Multiple event add uses checkbox list name="eventID[]"
-*/
-
 session_start();
 if (!isset($_SESSION['role']) || $_SESSION['role'] != 2) {
-    http_response_code(403);
-    echo '<div class="alert-fail">Access denied.</div>';
+    // Show error message and do not load the admin page content
+    echo '<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Oundle School Swim Team - Denied Access</title>
+    <meta name="viewport" content="width=1024, initial-scale=1">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="main-content">
+        <div class="page-title">
+            Access Denied
+        </div>
+        <div class="section">
+            <div class="alert-fail">
+                Permision Error: You do not have the right privilege to view this page.
+            </div>
+            <h2>Further options:</h2>
+            <ul>
+                <li>If you think this is an error, please <a href="contact.php">contact the administrator</a>.
+                <li><a href="login.php">Login</a></li>
+                <li><a href="index.php">Return to Home</a></li>
+            </ul>
+        </div>
+    </div>
+</body>
+
+</html>';
     exit();
 }
 
 include_once("connection.php");
-function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 
-// Build absolute action to avoid "Not Found" due to relative paths
-$ACTION_URL = htmlspecialchars(rtrim(dirname($_SERVER['PHP_SELF']), '/\\') . '/admin_meetEditor.php', ENT_QUOTES, 'UTF-8');
+$messages = [];
+$errors = [];
 
-$meetID = 0;
-if (isset($_GET['meetID'])) $meetID = (int)$_GET['meetID'];
-if (!$meetID && isset($_POST['meetID'])) $meetID = (int)$_POST['meetID'];
-
-$action = $_POST['action'] ?? '';
-$notice = '';
-$error  = '';
-
-// Student search state
-$studentSearchEventID = 0;
-$studentSearchQuery = '';
-$studentMatches = [];
-
-try {
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
-        if ($action === 'update_meet') {
-            $_POST = array_map('htmlspecialchars', $_POST);
-            $stmt = $conn->prepare("UPDATE tblmeet
-                SET meetName = :name, meetDate = :date, meetInfo = :info, external = :external, course = :course
-                WHERE meetID = :id");
-            $stmt->execute([
-                ':name' => $_POST['meetName'],
-                ':date' => $_POST['meetDate'],
-                ':info' => $_POST['meetInfo'],
-                ':external' => $_POST['external'],
-                ':course' => $_POST['course'],
-                ':id' => $meetID,
-            ]);
-            $notice = 'Meet updated.';
-        }
-        elseif ($action === 'add_events') {
-            $ids = isset($_POST['eventID']) ? (array)$_POST['eventID'] : [];
-            $ids = array_values(array_unique(array_map('intval', $ids)));
-            if ($ids) {
-                $chk = $conn->prepare("SELECT 1 FROM tblmeetHasEvent WHERE meetID = :mid AND eventID = :eid");
-                $ins = $conn->prepare("INSERT INTO tblmeetHasEvent (meetID, eventID) VALUES (:mid, :eid)");
-                foreach ($ids as $eid) {
-                    $chk->execute([':mid' => $meetID, ':eid' => $eid]);
-                    if (!$chk->fetch()) {
-                        $ins->execute([':mid' => $meetID, ':eid' => $eid]);
-                    }
-                }
-                $notice = 'Event(s) added to meet.';
-            }
-        }
-        elseif ($action === 'remove_event') {
-            $eventID = (int)($_POST['eventID'] ?? 0);
-            if ($eventID) {
-                $del = $conn->prepare("DELETE FROM tblmeetHasEvent WHERE meetID = :mid AND eventID = :eid");
-                $del->execute([':mid' => $meetID, ':eid' => $eventID]);
-                $notice = 'Event removed from meet.';
-            }
-        }
-        elseif ($action === 'search_students') {
-            $studentSearchEventID = (int)($_POST['eventID'] ?? 0);
-            $studentSearchQuery = trim($_POST['student_q'] ?? '');
-            if ($studentSearchEventID && $studentSearchQuery !== '') {
-                $like = "%$studentSearchQuery%";
-                $sql = "SELECT userID, forename, surname, userName, emailAddress
-                        FROM tbluser
-                        WHERE role = 1 AND (
-                            forename LIKE :like OR surname LIKE :like OR userName LIKE :like OR emailAddress LIKE :like
-                        )
-                        ORDER BY surname, forename
-                        LIMIT 15";
-                $stmt = $conn->prepare($sql);
-                $stmt->execute([':like' => $like]);
-                $studentMatches = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            }
-        }
-        elseif ($action === 'add_time_entry') {
-            $eventID = (int)($_POST['eventID'] ?? 0);
-            $userID  = (int)($_POST['userID'] ?? 0);
-            $time    = substr(trim($_POST['time'] ?? ''), 0, 8);
-            if ($eventID && $userID) {
-                $chk = $conn->prepare("SELECT 1 FROM tblmeetEventHasSwimmer WHERE userID = :uid AND meetID = :mid AND eventID = :eid");
-                $chk->execute([':uid' => $userID, ':mid' => $meetID, ':eid' => $eventID]);
-                if ($chk->fetch()) {
-                    $up = $conn->prepare("UPDATE tblmeetEventHasSwimmer SET time = :t WHERE userID = :uid AND meetID = :mid AND eventID = :eid");
-                    $up->execute([':t' => $time, ':uid' => $userID, ':mid' => $meetID, ':eid' => $eventID]);
-                    $notice = 'Time updated for swimmer.';
-                } else {
-                    $ins = $conn->prepare("INSERT INTO tblmeetEventHasSwimmer (userID, meetID, eventID, time) VALUES (:uid, :mid, :eid, :t)");
-                    $ins->execute([':uid' => $userID, ':mid' => $meetID, ':eid' => $eventID, ':t' => $time]);
-                    $notice = 'Swimmer added to event.';
-                }
-            }
-        }
-        elseif ($action === 'update_time_entry') {
-            $eventID = (int)($_POST['eventID'] ?? 0);
-            $userID  = (int)($_POST['userID'] ?? 0);
-            $time    = substr(trim($_POST['time'] ?? ''), 0, 8);
-            if ($eventID && $userID) {
-                $up = $conn->prepare("UPDATE tblmeetEventHasSwimmer SET time = :t WHERE userID = :uid AND meetID = :mid AND eventID = :eid");
-                $up->execute([':t' => $time, ':uid' => $userID, ':mid' => $meetID, ':eid' => $eventID]);
-                $notice = 'Time updated.';
-            }
-        }
-        elseif ($action === 'remove_time_entry') {
-            $eventID = (int)($_POST['eventID'] ?? 0);
-            $userID  = (int)($_POST['userID'] ?? 0);
-            if ($eventID && $userID) {
-                $del = $conn->prepare("DELETE FROM tblmeetEventHasSwimmer WHERE userID = :uid AND meetID = :mid AND eventID = :eid");
-                $del->execute([':uid' => $userID, ':mid' => $meetID, ':eid' => $eventID]);
-                $notice = 'Swimmer removed from event.';
-            }
-        }
-        elseif ($action === 'delete_meet') {
-            $del = $conn->prepare("DELETE FROM tblmeet WHERE meetID = :id");
-            $del->execute([':id' => $meetID]);
-            echo '<div class="alert-success">Meet deleted. Close the editor and refresh the page.</div>';
-            exit;
-        }
-    }
-
-    // Load the meet
-    $stmt = $conn->prepare("SELECT meetID, meetName, meetDate, meetInfo, external, course FROM tblmeet WHERE meetID = :id");
-    $stmt->execute([':id' => $meetID]);
-    $meet = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$meet) {
-        echo '<div class="alert-fail">Meet not found.</div>';
-        exit;
-    }
-
-    // Linked events
-    $stmt = $conn->prepare("SELECT e.eventID, e.eventName, e.course, e.gender
-                            FROM tblmeetHasEvent mhe
-                            JOIN tblevent e ON e.eventID = mhe.eventID
-                            WHERE mhe.meetID = :id
-                            ORDER BY e.eventName, e.gender");
-    $stmt->execute([':id' => $meetID]);
-    $linkedEvents = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    // Available events to add (course 'L'/'S')
-    $stmt = $conn->prepare("SELECT eventID, eventName, course, gender
-                            FROM tblevent
-                            WHERE course = :course
-                            ORDER BY eventName, gender");
-    $stmt->execute([':course' => $meet['course']]);
-    $eventOptions = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-} catch (PDOException $e) {
-    $error = 'Database Error: ' . $e->getMessage();
+// Find meetID (GET edit or POST meetID)
+$meetID = null;
+if (isset($_GET['edit']) && ctype_digit((string)$_GET['edit'])) {
+    $meetID = (int)$_GET['edit'];
+} elseif (isset($_POST['meetID']) && ctype_digit((string)$_POST['meetID'])) {
+    $meetID = (int)$_POST['meetID'];
+} else {
+    $errors[] = "No meet selected.";
 }
+
+// Helpers
+function getMeet(PDO $conn, int $id) {
+    $stmt = $conn->prepare("SELECT meetID, meetName, meetDate, meetInfo, external, course FROM tblmeet WHERE meetID = :id");
+    $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+    $stmt->execute();
+    return $stmt->fetch(PDO::FETCH_ASSOC);
+}
+function getAllowedEvents(PDO $conn, string $course) {
+    // Strict L/S only
+    $stmt = $conn->prepare("SELECT eventID, eventName, gender FROM tblevent WHERE course = :c ORDER BY eventName, gender");
+    $stmt->bindValue(':c', $course);
+    $stmt->execute();
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+function getMeetEventIds(PDO $conn, int $meetID) {
+    $stmt = $conn->prepare("SELECT eventID FROM tblmeetHasEvent WHERE meetID = :id");
+    $stmt->bindValue(':id', $meetID, PDO::PARAM_INT);
+    $stmt->execute();
+    return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+}
+function getMeetEventsLabeled(PDO $conn, int $meetID) {
+    $sql = "SELECT e.eventID, e.eventName, e.gender
+            FROM tblevent e
+            INNER JOIN tblmeetHasEvent me ON me.eventID = e.eventID
+            WHERE me.meetID = :id
+            ORDER BY e.eventName, e.gender";
+    $stmt = $conn->prepare($sql);
+    $stmt->bindValue(':id', $meetID, PDO::PARAM_INT);
+    $stmt->execute();
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+function getSwimmers(PDO $conn) {
+    $stmt = $conn->prepare("SELECT userID, forename, surname, userName FROM tbluser WHERE role = 1 ORDER BY surname, forename");
+    $stmt->execute();
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+function getTimes(PDO $conn, int $meetID) {
+    $sql = "SELECT ms.userID, u.forename, u.surname, ms.eventID, e.eventName, e.gender, ms.time
+            FROM tblmeetEventHasSwimmer ms
+            INNER JOIN tblevent e ON e.eventID = ms.eventID
+            INNER JOIN tbluser u ON u.userID = ms.userID
+            WHERE ms.meetID = :id
+            ORDER BY e.eventName, e.gender, u.surname, u.forename";
+    $stmt = $conn->prepare($sql);
+    $stmt->bindValue(':id', $meetID, PDO::PARAM_INT);
+    $stmt->execute();
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+// Handle POST actions (keep format simple)
+if ($meetID && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = $_POST['action'] ?? '';
+
+    try {
+        if ($action === 'update_meet') {
+            // Option C: reject special characters to avoid encoding issues
+            if (
+                preg_match('/[<>&]/', $_POST['meetName'] ?? '') ||
+                preg_match('/[<>&]/', $_POST['meetInfo'] ?? '')
+            ) {
+                throw new Exception("Please avoid special characters like &, <, > in the meet name and description.");
+            }
+
+            // Save raw values (do not HTML-escape before DB)
+            $stmt = $conn->prepare("UPDATE tblmeet 
+                SET meetName = :n, meetDate = :d, meetInfo = :i, external = :x, course = :c
+                WHERE meetID = :id");
+            $stmt->bindValue(':n', $_POST['meetName']);
+            $stmt->bindValue(':d', $_POST['meetDate']);
+            $stmt->bindValue(':i', $_POST['meetInfo']);
+            $stmt->bindValue(':x', ($_POST['external'] === 'Y' ? 'Y' : 'N'));
+            $stmt->bindValue(':c', ($_POST['course'] === 'S' ? 'S' : 'L'));
+            $stmt->bindValue(':id', $meetID, PDO::PARAM_INT);
+            $stmt->execute();
+
+            $messages[] = "Meet details updated.";
+        }
+
+        if ($action === 'save_events') {
+            $selected = isset($_POST['event_ids']) && is_array($_POST['event_ids']) ? array_map('intval', $_POST['event_ids']) : [];
+
+            $meet = getMeet($conn, $meetID);
+            if (!$meet) throw new Exception("Meet not found.");
+
+            $allowed = getAllowedEvents($conn, $meet['course']);
+            $allowedIds = array_map(fn($e) => (int)$e['eventID'], $allowed);
+
+            // Keep only allowed ids
+            $selected = array_values(array_intersect($selected, $allowedIds));
+
+            $current = getMeetEventIds($conn, $meetID);
+
+            $toAdd = array_diff($selected, $current);
+            $toDel = array_diff($current, $selected);
+
+            if (!empty($toAdd)) {
+                $ins = $conn->prepare("INSERT INTO tblmeetHasEvent (meetID, eventID) VALUES (:m, :e)");
+                foreach ($toAdd as $eid) {
+                    $ins->bindValue(':m', $meetID, PDO::PARAM_INT);
+                    $ins->bindValue(':e', $eid, PDO::PARAM_INT);
+                    $ins->execute();
+                }
+            }
+            if (!empty($toDel)) {
+                $del = $conn->prepare("DELETE FROM tblmeetHasEvent WHERE meetID = :m AND eventID = :e");
+                foreach ($toDel as $eid) {
+                    $del->bindValue(':m', $meetID, PDO::PARAM_INT);
+                    $del->bindValue(':e', $eid, PDO::PARAM_INT);
+                    $del->execute();
+                }
+            }
+
+            $messages[] = "Events updated.";
+        }
+
+        if ($action === 'add_time' || $action === 'update_time') {
+            $eventID = isset($_POST['eventID']) ? (int)$_POST['eventID'] : 0;
+            $userID  = isset($_POST['userID']) ? (int)$_POST['userID'] : 0;
+            $time    = isset($_POST['time']) ? trim($_POST['time']) : '';
+
+            if ($eventID <= 0 || $userID <= 0 || $time === '') {
+                throw new Exception("All fields are required for adding/updating a time.");
+            }
+            if (strlen($time) > 8) {
+                throw new Exception("Time must be at most 8 characters (e.g., 59.59.9).");
+            }
+
+            // Ensure event is attached
+            $chk = $conn->prepare("SELECT 1 FROM tblmeetHasEvent WHERE meetID = :m AND eventID = :e");
+            $chk->bindValue(':m', $meetID, PDO::PARAM_INT);
+            $chk->bindValue(':e', $eventID, PDO::PARAM_INT);
+            $chk->execute();
+            if (!$chk->fetchColumn()) throw new Exception("Event is not attached to the meet.");
+
+            $sql = "INSERT INTO tblmeetEventHasSwimmer (userID, meetID, eventID, time)
+                    VALUES (:u, :m, :e, :t)
+                    ON DUPLICATE KEY UPDATE time = VALUES(time)";
+            $stmt = $conn->prepare($sql);
+            $stmt->bindValue(':u', $userID, PDO::PARAM_INT);
+            $stmt->bindValue(':m', $meetID, PDO::PARAM_INT);
+            $stmt->bindValue(':e', $eventID, PDO::PARAM_INT);
+            $stmt->bindValue(':t', $time);
+            $stmt->execute();
+
+            $messages[] = ($action === 'add_time') ? "Time added." : "Time updated.";
+        }
+
+        if ($action === 'delete_time') {
+            $eventID = isset($_POST['eventID']) ? (int)$_POST['eventID'] : 0;
+            $userID  = isset($_POST['userID']) ? (int)$_POST['userID'] : 0;
+            if ($eventID <= 0 || $userID <= 0) throw new Exception("Invalid delete request.");
+
+            $del = $conn->prepare("DELETE FROM tblmeetEventHasSwimmer WHERE userID = :u AND meetID = :m AND eventID = :e");
+            $del->bindValue(':u', $userID, PDO::PARAM_INT);
+            $del->bindValue(':m', $meetID, PDO::PARAM_INT);
+            $del->bindValue(':e', $eventID, PDO::PARAM_INT);
+            $del->execute();
+
+            $messages[] = "Time removed.";
+        }
+
+    } catch (Exception $ex) {
+        $errors[] = $ex->getMessage();
+    } catch (PDOException $ex) {
+        $errors[] = "Database error: " . $ex->getMessage();
+    }
+}
+
+// Load data for render
+$meet = $meetID ? getMeet($conn, $meetID) : null;
+$allowedEvents = ($meet && isset($meet['course'])) ? getAllowedEvents($conn, $meet['course']) : [];
+$currentEventIds = $meetID ? getMeetEventIds($conn, $meetID) : [];
+$meetEventsForTimes = $meetID ? getMeetEventsLabeled($conn, $meetID) : [];
+$swimmers = getSwimmers($conn);
+$times = $meetID ? getTimes($conn, $meetID) : [];
+
 ?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Oundle School Swim Team - Meet Editor</title>
+    <meta name="viewport" content="width=1024, initial-scale=1">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<?php include 'navbar.php'; ?>
 
-<?php if ($error): ?>
-    <div class="alert-fail"><?= h($error) ?></div>
-<?php endif; ?>
-<?php if ($notice): ?>
-    <div class="alert-success"><?= h($notice) ?></div>
-<?php endif; ?>
+<div class="main-content">
+    <div class="page-title">Meet Editor</div>
 
-<!-- Top: Meet details -->
-<div class="section">
-    <h2>Edit Meet</h2>
-    <form action="<?= $ACTION_URL ?>" method="post" autocomplete="off">
-        <input type="hidden" name="action" value="update_meet">
-        <input type="hidden" name="meetID" value="<?= (int)$meet['meetID'] ?>">
+    <div class="section">
+        <a href="admin_meetList.php" class="btn">Back to Meet List</a>
 
-        <h3>Name of Meet</h3>
-        <div class="form-row"><input type="text" name="meetName" value="<?= h($meet['meetName']) ?>" required></div>
+        <?php foreach ($messages as $msg): ?>
+            <div class="alert-success"><?= htmlspecialchars($msg) ?></div>
+        <?php endforeach; ?>
+        <?php foreach ($errors as $err): ?>
+            <div class="alert-fail"><?= htmlspecialchars($err) ?></div>
+        <?php endforeach; ?>
 
-        <h3>Course type</h3>
-        <div class="form-row">
-            <select name="course" required>
-                <option value="L" <?= $meet['course']==='L'?'selected':'' ?>>Longcourse</option>
-                <option value="S" <?= $meet['course']==='S'?'selected':'' ?>>Shortcourse</option>
-            </select>
-        </div>
+        <?php if ($meet): ?>
+        <form method="post" class="form-section form-section--wide">
+            <h2>Edit Meet Details</h2>
+            <input type="hidden" name="meetID" value="<?= (int)$meet['meetID'] ?>">
 
-        <h3>Date of Meet</h3>
-        <div class="form-row"><input type="date" name="meetDate" value="<?= h($meet['meetDate']) ?>" required></div>
-
-        <h3>Is this meet in school?</h3>
-        <div class="form-row">
-            <select name="external" required>
-                <option value="N" <?= $meet['external']==='N'?'selected':'' ?>>Yes</option>
-                <option value="Y" <?= $meet['external']==='Y'?'selected':'' ?>>No</option>
-            </select>
-        </div>
-
-        <h3>Meet description</h3>
-        <div class="form-row"><input type="text" name="meetInfo" maxlength="400" value="<?= h($meet['meetInfo']) ?>" required></div>
-
-        <div class="form-row">
-            <button type="submit">Save changes</button>
-        </div>
-    </form>
-</div>
-
-<!-- Events -->
-<div class="section">
-    <h2>Events in this meet</h2>
-
-    <?php if (!$linkedEvents): ?>
-        <p>No events added yet.</p>
-    <?php else: ?>
-        <table class="meets">
-            <thead>
-                <tr>
-                    <th style="width:80px;">Event ID</th>
-                    <th>Event</th>
-                    <th style="width:105px;">Course</th>
-                    <th style="width:90px;">Gender</th>
-                    <th style="width:110px;">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($linkedEvents as $e): ?>
-                <tr>
-                    <td><?= (int)$e['eventID'] ?></td>
-                    <td><?= h($e['eventName']) ?></td>
-                    <td><?= ($e['course']==='L' ? 'Longcourse' : 'Shortcourse') ?></td>
-                    <td><?= h($e['gender']) ?></td>
-                    <td>
-                        <form action="<?= $ACTION_URL ?>" method="post" style="display:inline;">
-                            <input type="hidden" name="action" value="remove_event">
-                            <input type="hidden" name="meetID" value="<?= (int)$meetID ?>">
-                            <input type="hidden" name="eventID" value="<?= (int)$e['eventID'] ?>">
-                            <button type="submit">Remove</button>
-                        </form>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-    <?php endif; ?>
-
-    <!-- Add multiple events via checkbox list (W3Schools pattern name="eventID[]") -->
-    <form action="<?= $ACTION_URL ?>" method="post" class="add-events-row">
-        <input type="hidden" name="action" value="add_events">
-        <input type="hidden" name="meetID" value="<?= (int)$meetID ?>">
-
-        <?php if (!$eventOptions): ?>
-            <p>No available events for this course.</p>
-        <?php else: ?>
-            <div class="form-row" style="flex-wrap:wrap; gap:10px;">
-                <?php foreach ($eventOptions as $opt): ?>
-                    <label style="display:flex; align-items:center; gap:6px;">
-                        <input type="checkbox" name="eventID[]" value="<?= (int)$opt['eventID'] ?>">
-                        <span><?= h($opt['eventName']) ?> (<?= $opt['course']==='L' ? 'L' : 'S' ?>/<?= h($opt['gender']) ?>)</span>
-                    </label>
-                <?php endforeach; ?>
-            </div>
             <div class="form-row">
-                <button type="submit">Add Selected Event(s)</button>
+                <input type="text" name="meetName" value="<?= htmlspecialchars($meet['meetName']) ?>" placeholder="Name of Meet" required>
             </div>
+
+            <h3>Course type:</h3>
+            <div class="form-row">
+                <select name="course" class="input" required>
+                    <option value="L" <?= $meet['course']==='L'?'selected':'' ?>>Longcourse</option>
+                    <option value="S" <?= $meet['course']==='S'?'selected':'' ?>>Shortcourse</option>
+                </select>
+            </div>
+
+            <h3>Date of Meet:</h3>
+            <div class="form-row">
+                <input type="date" name="meetDate" value="<?= htmlspecialchars($meet['meetDate']) ?>" required>
+            </div>
+
+            <h3>External:</h3>
+            <div class="form-row">
+                <select name="external" class="input" required>
+                    <option value="N" <?= $meet['external']==='N'?'selected':'' ?>>No</option>
+                    <option value="Y" <?= $meet['external']==='Y'?'selected':'' ?>>Yes</option>
+                </select>
+            </div>
+
+            <input type="text" name="meetInfo" value="<?= htmlspecialchars($meet['meetInfo']) ?>" placeholder="Meet description (400 characters max)" maxlength="400" required>
+
+            <div class="form-row form-row--center">
+                <input type="hidden" name="action" value="update_meet">
+                <button type="submit">Save Details</button>
+            </div>
+        </form>
         <?php endif; ?>
-    </form>
-</div>
+    </div>
 
-<!-- Times per event -->
-<div class="section">
-    <h2>Times (per swimmer)</h2>
+    <?php if ($meet): ?>
+    <div class="section">
+        <h2>Add/Remove Events (<?= $meet['course']==='L' ? 'Longcourse' : 'Shortcourse' ?>)</h2>
 
-    <?php if (!$linkedEvents): ?>
-        <p>Add events first to manage times.</p>
-    <?php endif; ?>
+        <form method="post">
+            <input type="hidden" name="meetID" value="<?= (int)$meet['meetID'] ?>">
+            <input type="hidden" name="action" value="save_events">
 
-    <?php foreach ($linkedEvents as $e): ?>
-        <?php
-        $stmt = $conn->prepare("SELECT s.userID, s.forename, s.surname, s.userName, s.emailAddress, mes.time
-                                FROM tblmeetEventHasSwimmer mes
-                                JOIN tbluser s ON s.userID = mes.userID
-                                WHERE mes.meetID = :mid AND mes.eventID = :eid
-                                ORDER BY s.surname, s.forename");
-        $stmt->execute([':mid' => $meetID, ':eid' => (int)$e['eventID']]);
-        $swimmers = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        ?>
-        <div class="sub-section">
-            <h3 class="event-subtitle">
-                <?= h($e['eventName']) ?> (<?= $e['course']==='L' ? 'Long' : 'Short' ?> / <?= h($e['gender']) ?>)
-            </h3>
-
-            <?php if (!$swimmers): ?>
-                <p>No swimmers added yet.</p>
-            <?php else: ?>
-                <table class="meets">
-                    <thead>
+            <table class="meets events-table">
+                <tbody>
+                <?php if (empty($allowedEvents)): ?>
+                    <tr><td>No events available for this course.</td></tr>
+                <?php else: ?>
+                    <?php foreach (array_chunk($allowedEvents, 3) as $row): ?>
                         <tr>
-                            <th style="width:80px;">User ID</th>
-                            <th>Swimmer</th>
-                            <th style="width:120px;">Username</th>
-                            <th style="width:160px;">Email</th>
-                            <th style="width:120px;">Time</th>
-                            <th style="width:170px;">Actions</th>
+                            <?php for ($i=0; $i<3; $i++): ?>
+                                <td>
+                                    <?php if (isset($row[$i])): 
+                                        $ev = $row[$i];
+                                        $eid = (int)$ev['eventID'];
+                                        $label = $ev['eventName'] . ' (' . $ev['gender'] . ')';
+                                    ?>
+                                    <label class="check-item">
+                                        <input type="checkbox" name="event_ids[]" value="<?= $eid ?>" <?= in_array($eid, $currentEventIds, true) ? 'checked' : '' ?>>
+                                        <?= htmlspecialchars($label) ?>
+                                    </label>
+                                    <?php endif; ?>
+                                </td>
+                            <?php endfor; ?>
                         </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($swimmers as $row): ?>
-                            <tr>
-                                <td><?= (int)$row['userID'] ?></td>
-                                <td><?= h($row['forename'] . ' ' . $row['surname']) ?></td>
-                                <td><?= h($row['userName']) ?></td>
-                                <td><?= h($row['emailAddress']) ?></td>
-                                <td>
-                                    <form action="<?= $ACTION_URL ?>" method="post" class="inline-form">
-                                        <input type="hidden" name="action" value="update_time_entry">
-                                        <input type="hidden" name="meetID" value="<?= (int)$meetID ?>">
-                                        <input type="hidden" name="eventID" value="<?= (int)$e['eventID'] ?>">
-                                        <input type="hidden" name="userID"  value="<?= (int)$row['userID'] ?>">
-                                        <input type="text" name="time" value="<?= h($row['time']) ?>" placeholder="mm:ss.hh" maxlength="8" class="time-input">
-                                        <button type="submit">Save</button>
-                                    </form>
-                                </td>
-                                <td>
-                                    <form action="<?= $ACTION_URL ?>" method="post" onsubmit="return confirm('Remove swimmer from this event?');" class="inline-form">
-                                        <input type="hidden" name="action" value="remove_time_entry">
-                                        <input type="hidden" name="meetID" value="<?= (int)$meetID ?>">
-                                        <input type="hidden" name="eventID" value="<?= (int)$e['eventID'] ?>">
-                                        <input type="hidden" name="userID"  value="<?= (int)$row['userID'] ?>">
-                                        <button type="submit" class="btn-danger">Remove</button>
-                                    </form>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            <?php endif; ?>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+                </tbody>
+            </table>
 
-            <!-- Add swimmer to this event -->
-            <form action="<?= $ACTION_URL ?>" method="post" class="search-and-add">
-                <input type="hidden" name="action" value="search_students">
-                <input type="hidden" name="meetID" value="<?= (int)$meetID ?>">
-                <input type="hidden" name="eventID" value="<?= (int)$e['eventID'] ?>">
-                <input type="text" name="student_q" placeholder="Search student (name/username/email)" class="search-input">
-                <button type="submit">Search</button>
+            <div class="form-row form-row--center mt-12">
+                <button type="submit">Save Events</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="section">
+        <h2>Times</h2>
+
+        <div class="sub-section">
+            <h3 class="event-subtitle">Add a Time</h3>
+            <form method="post" class="inline-form wrap">
+                <input type="hidden" name="meetID" value="<?= (int)$meet['meetID'] ?>">
+                <input type="hidden" name="action" value="add_time">
+
+                <select name="eventID" class="student-select" required>
+                    <option value="">Select event</option>
+                    <?php foreach ($meetEventsForTimes as $mev): ?>
+                        <option value="<?= (int)$mev['eventID'] ?>">
+                            <?= htmlspecialchars($mev['eventName'] . ' (' . $mev['gender'] . ')') ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+
+                <select name="userID" class="student-select" required>
+                    <option value="">Select swimmer</option>
+                    <?php foreach ($swimmers as $sw): ?>
+                        <option value="<?= (int)$sw['userID'] ?>">
+                            <?= htmlspecialchars($sw['surname'] . ', ' . $sw['forename'] . ' [' . $sw['userName'] . ']') ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+
+                <input type="text" name="time" class="time-input" placeholder="mm:ss.ss" maxlength="8" required>
+                <button type="submit" class="btn">Add</button>
             </form>
         </div>
-    <?php endforeach; ?>
-</div>
 
-<!-- Danger zone -->
-<div class="section">
-    <h2 style="color:#9b1c1c;">Delete</h2>
-    <form action="<?= $ACTION_URL ?>" method="post" onsubmit="return confirm('Delete this meet? This action cannot be undone.');">
-        <input type="hidden" name="action" value="delete_meet">
-        <input type="hidden" name="meetID" value="<?= (int)$meetID ?>">
-        <button type="submit" class="btn-danger">Delete Meet</button>
-    </form>
+        <div class="sub-section mt-12">
+            <h3 class="event-subtitle">Existing Times</h3>
+            <table class="meets">
+                <thead>
+                    <tr>
+                        <th>Event</th>
+                        <th>Swimmer</th>
+                        <th>Time</th>
+                        <th class="col-actions-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php if (empty($times)): ?>
+                    <tr><td colspan="4">No times recorded yet.</td></tr>
+                <?php else: ?>
+                    <?php foreach ($times as $row): ?>
+                        <tr>
+                            <td><?= htmlspecialchars($row['eventName'] . ' (' . $row['gender'] . ')') ?></td>
+                            <td><?= htmlspecialchars($row['surname'] . ', ' . $row['forename']) ?></td>
+                            <td>
+                                <form method="post" class="inline-form">
+                                    <input type="hidden" name="meetID" value="<?= (int)$meet['meetID'] ?>">
+                                    <input type="hidden" name="eventID" value="<?= (int)$row['eventID'] ?>">
+                                    <input type="hidden" name="userID" value="<?= (int)$row['userID'] ?>">
+                                    <input type="text" name="time" class="time-input" value="<?= htmlspecialchars($row['time']) ?>" maxlength="8" required>
+                            </td>
+                            <td class="col-actions-right">
+                                    <button type="submit" name="action" value="update_time" class="btn">Update</button>
+                                    <button type="submit" name="action" value="delete_time" class="btn btn-danger">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <?php endif; ?>
 </div>
+</body>
+</html>

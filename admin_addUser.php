@@ -1,5 +1,4 @@
 <?php
-
 session_start();
 if (!isset($_SESSION['role']) || $_SESSION['role'] != 2) {
     // Show error message and do not load the admin page content
@@ -8,7 +7,7 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] != 2) {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Admin Section - Access Denied</title>
+    <title>Oundle School Swim Team - Denied Access</title>
     <meta name="viewport" content="width=1024, initial-scale=1">
     <link rel="stylesheet" href="style.css">
 </head>

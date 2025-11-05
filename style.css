@@ -148,10 +148,22 @@
     margin-bottom: 0.5rem;
     font-family: 'Arial Rounded MT Bold', Arial, sans-serif;
     transition: background 0.2s;
+    text-decoration: none;           /* ADD: stop underline on <a class="btn"> */
 }
 
 .form-section button[type="submit"]:hover,
-.btn:hover { background: #00335d; }
+.btn:hover {
+    background: #00335d;
+    text-decoration: none;           /* ADD: keep underline off on hover too */
+}
+
+/* Center submit buttons inside .form-section forms */
+.form-section button[type="submit"] {
+    width: auto;                     /* CHANGE: was full-width somewhere; make natural width */
+    display: block;                  /* CHANGE: allow auto margins to center */
+    margin: 0.5rem auto;             /* CHANGE: center horizontally */
+}
+
 
 .form-section .link-secondary {
     color: #0074d9;
@@ -213,7 +225,7 @@
 }
 
 /* Table + Search + Pagination (recycled styling for admin lists) */
-.table-wrap { padding-top: 20px; }
+.table-wrap { padding-top: 20px; padding-bottom: 20px; }
 
 .search-bar {
     display: flex;
@@ -248,10 +260,11 @@
 }
 
 .meets th, .meets td {
-    padding: 10px 12px;
+    padding: 14px 16px; /* increased for better row height */
     border-bottom: 1px solid #e5e7eb;
     text-align: left;
     font-size: 0.96rem;
+    vertical-align: middle;
 }
 
 .meets th {
@@ -405,3 +418,80 @@ body { padding-top: 100px; }
         gap: 0;
     }
 }
+
+/* Minimal utilities added for admin pages (no changes to existing rules) */
+.mt-12 { margin-top: 12px; }
+.ml-8 { margin-left: 8px; }
+.wrap { flex-wrap: wrap; }
+.gap-10 { gap: 10px; }
+
+/* Checkbox row label layout for add-events list */
+.check-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Optional: container class in case you want to target the list later */
+.checkbox-list { }
+
+
+/* Toolbar with left search and right filters */
+.toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 14px; /* increased to avoid crowding */
+}
+.toolbar-left { display: flex; flex: 1; }
+.toolbar-right { display: flex; gap: 10px; align-items: center; }
+
+.filters-group .check-item { margin-left: 2px; }
+
+/* Right-align actions column */
+.col-actions-right { text-align: right; }
+
+/* Group action buttons neatly and prevent wrapping collisions */
+.action-buttons {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* Per-page controls at bottom (more spacing, never overlaps) */
+.per-page {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    margin-top: 20px; /* more breathing room below pagination/table */
+    clear: both;
+}
+.per-page-label {
+    color: #002f63;
+    font-family: 'Arial Rounded MT Bold', Arial, sans-serif;
+    font-size: 0.95rem;
+}
+.btn-active { background: #00335d; }
+
+/* Wider editor form option */
+.form-section--wide { max-width: 700px; }
+
+/* Small bottom margin utility */
+.mb-10 { margin-bottom: 10px; }
+
+/* Events table: full-width, spaced checkboxes in 3 columns */
+.events-table td {
+    width: 33.33%;
+    vertical-align: top;
+    padding: 14px 16px;
+}
+.events-table .check-item { gap: 10px; font-size: 0.98rem; }
+
+/* Danger button variant (for delete) */
+.btn-danger { background: #b72828; }
+.btn-danger:hover { background: #8e1f1f; }
