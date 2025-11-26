@@ -68,7 +68,7 @@
                 <button type="submit">Login</button>
             </form>
 
-            <a class="link-secondary" href="forgot_password.php">Forgot password?</a>
+            <a class="link-secondary" href="contact.php">Forgot password?</a>
             <div class="extra-section">
                 A Swim Team member and don't have an account?
                 <br>

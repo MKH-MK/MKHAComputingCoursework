@@ -40,12 +40,14 @@ try {
 
 
     // Create Tbl_Event
+    // CHANGES FOR RELAY: add eventType to distinguish individual vs relay events
     $stmt = $conn->prepare(
         "CREATE TABLE tblevent (
             eventID INT(3) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             eventName VARCHAR(100) NOT NULL,
             course ENUM('L', 'S') NOT NULL,
-            gender ENUM('M', 'F', 'MIX') NOT NULL
+            gender ENUM('M', 'F', 'MIX') NOT NULL,
+            eventType ENUM('INDIV','RELAY') NOT NULL DEFAULT 'INDIV'
         );"
     );
 
@@ -54,115 +56,116 @@ try {
     echo "<br>tblevent created";
 
     // Prefill events for Tbl_Event
-    $insert_sql = "INSERT INTO tblevent (eventName, course, gender) VALUES
+    // CHANGES FOR RELAY: mark relay rows as eventType='RELAY', others default INDIV
+    $insert_sql = "INSERT INTO tblevent (eventName, course, gender, eventType) VALUES
 
-     ('Backstroke 50m', 'L', 'M'),
-    ('Backstroke 50m', 'L', 'F'),
-    ('Backstroke 50m', 'S', 'M'),
-    ('Backstroke 50m', 'S', 'F'),
+    ('Backstroke 50m', 'L', 'M', 'INDIV'),
+    ('Backstroke 50m', 'L', 'F', 'INDIV'),
+    ('Backstroke 50m', 'S', 'M', 'INDIV'),
+    ('Backstroke 50m', 'S', 'F', 'INDIV'),
 
-    ('Backstroke 100m', 'L', 'M'),
-    ('Backstroke 100m', 'L', 'F'),
-    ('Backstroke 100m', 'S', 'M'),
-    ('Backstroke 100m', 'S', 'F'),
+    ('Backstroke 100m', 'L', 'M', 'INDIV'),
+    ('Backstroke 100m', 'L', 'F', 'INDIV'),
+    ('Backstroke 100m', 'S', 'M', 'INDIV'),
+    ('Backstroke 100m', 'S', 'F', 'INDIV'),
 
-    ('Backstroke 200m', 'L', 'M'),
-    ('Backstroke 200m', 'L', 'F'),
-    ('Backstroke 200m', 'S', 'M'),
-    ('Backstroke 200m', 'S', 'F'),
+    ('Backstroke 200m', 'L', 'M', 'INDIV'),
+    ('Backstroke 200m', 'L', 'F', 'INDIV'),
+    ('Backstroke 200m', 'S', 'M', 'INDIV'),
+    ('Backstroke 200m', 'S', 'F', 'INDIV'),
 
-    ('Breastroke 50m', 'L', 'M'),
-    ('Breastroke 50m', 'L', 'F'),
-    ('Breastroke 50m', 'S', 'M'),
-    ('Breastroke 50m', 'S', 'F'),
+    ('Breastroke 50m', 'L', 'M', 'INDIV'),
+    ('Breastroke 50m', 'L', 'F', 'INDIV'),
+    ('Breastroke 50m', 'S', 'M', 'INDIV'),
+    ('Breastroke 50m', 'S', 'F', 'INDIV'),
 
-    ('Breastroke 100m', 'L', 'M'),
-    ('Breastroke 100m', 'L', 'F'),
-    ('Breastroke 100m', 'S', 'M'),
-    ('Breastroke 100m', 'S', 'F'),
+    ('Breastroke 100m', 'L', 'M', 'INDIV'),
+    ('Breastroke 100m', 'L', 'F', 'INDIV'),
+    ('Breastroke 100m', 'S', 'M', 'INDIV'),
+    ('Breastroke 100m', 'S', 'F', 'INDIV'),
 
-    ('Breastroke 200m', 'L', 'M'),
-    ('Breastroke 200m', 'L', 'F'),
-    ('Breastroke 200m', 'S', 'M'),
-    ('Breastroke 200m', 'S', 'F'),
+    ('Breastroke 200m', 'L', 'M', 'INDIV'),
+    ('Breastroke 200m', 'L', 'F', 'INDIV'),
+    ('Breastroke 200m', 'S', 'M', 'INDIV'),
+    ('Breastroke 200m', 'S', 'F', 'INDIV'),
 
-    ('Fly 50m', 'L', 'M'),
-    ('Fly 50m', 'L', 'F'),
-    ('Fly 50m', 'S', 'M'),
-    ('Fly 50m', 'S', 'F'),
+    ('Fly 50m', 'L', 'M', 'INDIV'),
+    ('Fly 50m', 'L', 'F', 'INDIV'),
+    ('Fly 50m', 'S', 'M', 'INDIV'),
+    ('Fly 50m', 'S', 'F', 'INDIV'),
 
-    ('Fly 100m', 'L', 'M'),
-    ('Fly 100m', 'L', 'F'),
-    ('Fly 100m', 'S', 'M'),
-    ('Fly 100m', 'S', 'F'),
+    ('Fly 100m', 'L', 'M', 'INDIV'),
+    ('Fly 100m', 'L', 'F', 'INDIV'),
+    ('Fly 100m', 'S', 'M', 'INDIV'),
+    ('Fly 100m', 'S', 'F', 'INDIV'),
 
-    ('Fly 200m', 'L', 'M'),
-    ('Fly 200m', 'L', 'F'),
-    ('Fly 200m', 'S', 'M'),
-    ('Fly 200m', 'S', 'F'),
+    ('Fly 200m', 'L', 'M', 'INDIV'),
+    ('Fly 200m', 'L', 'F', 'INDIV'),
+    ('Fly 200m', 'S', 'M', 'INDIV'),
+    ('Fly 200m', 'S', 'F', 'INDIV'),
 
-    ('Freestyle 50m', 'L', 'M'),
-    ('Freestyle 50m', 'L', 'F'),
-    ('Freestyle 50m', 'S', 'M'),
-    ('Freestyle 50m', 'S', 'F'),
+    ('Freestyle 50m', 'L', 'M', 'INDIV'),
+    ('Freestyle 50m', 'L', 'F', 'INDIV'),
+    ('Freestyle 50m', 'S', 'M', 'INDIV'),
+    ('Freestyle 50m', 'S', 'F', 'INDIV'),
 
-    ('Freestyle 100m', 'L', 'M'),
-    ('Freestyle 100m', 'L', 'F'),
-    ('Freestyle 100m', 'S', 'M'),
-    ('Freestyle 100m', 'S', 'F'),
+    ('Freestyle 100m', 'L', 'M', 'INDIV'),
+    ('Freestyle 100m', 'L', 'F', 'INDIV'),
+    ('Freestyle 100m', 'S', 'M', 'INDIV'),
+    ('Freestyle 100m', 'S', 'F', 'INDIV'),
 
-    ('Freestyle 200m', 'L', 'M'),
-    ('Freestyle 200m', 'L', 'F'),
-    ('Freestyle 200m', 'S', 'M'),
-    ('Freestyle 200m', 'S', 'F'),
+    ('Freestyle 200m', 'L', 'M', 'INDIV'),
+    ('Freestyle 200m', 'L', 'F', 'INDIV'),
+    ('Freestyle 200m', 'S', 'M', 'INDIV'),
+    ('Freestyle 200m', 'S', 'F', 'INDIV'),
 
-    ('Freestyle 400m', 'L', 'M'),
-    ('Freestyle 400m', 'L', 'F'),
-    ('Freestyle 400m', 'S', 'M'),
-    ('Freestyle 400m', 'S', 'F'),
+    ('Freestyle 400m', 'L', 'M', 'INDIV'),
+    ('Freestyle 400m', 'L', 'F', 'INDIV'),
+    ('Freestyle 400m', 'S', 'M', 'INDIV'),
+    ('Freestyle 400m', 'S', 'F', 'INDIV'),
 
-    ('Freestyle 800m', 'L', 'M'),
-    ('Freestyle 800m', 'L', 'F'),
-    ('Freestyle 800m', 'S', 'M'),
-    ('Freestyle 800m', 'S', 'F'),
+    ('Freestyle 800m', 'L', 'M', 'INDIV'),
+    ('Freestyle 800m', 'L', 'F', 'INDIV'),
+    ('Freestyle 800m', 'S', 'M', 'INDIV'),
+    ('Freestyle 800m', 'S', 'F', 'INDIV'),
 
-    ('Freestyle 1500m', 'L', 'M'),
-    ('Freestyle 1500m', 'L', 'F'),
-    ('Freestyle 1500m', 'S', 'M'),
-    ('Freestyle 1500m', 'S', 'F'),
+    ('Freestyle 1500m', 'L', 'M', 'INDIV'),
+    ('Freestyle 1500m', 'L', 'F', 'INDIV'),
+    ('Freestyle 1500m', 'S', 'M', 'INDIV'),
+    ('Freestyle 1500m', 'S', 'F', 'INDIV'),
 
-    ('IM 100m', 'L', 'M'),
-    ('IM 100m', 'L', 'F'),
-    ('IM 100m', 'S', 'M'),
-    ('IM 100m', 'S', 'F'),
+    ('IM 100m', 'L', 'M', 'INDIV'),
+    ('IM 100m', 'L', 'F', 'INDIV'),
+    ('IM 100m', 'S', 'M', 'INDIV'),
+    ('IM 100m', 'S', 'F', 'INDIV'),
 
-    ('IM 200m', 'L', 'M'),
-    ('IM 200m', 'L', 'F'),
-    ('IM 200m', 'S', 'M'),
-    ('IM 200m', 'S', 'F'),
+    ('IM 200m', 'L', 'M', 'INDIV'),
+    ('IM 200m', 'L', 'F', 'INDIV'),
+    ('IM 200m', 'S', 'M', 'INDIV'),
+    ('IM 200m', 'S', 'F', 'INDIV'),
 
-    ('IM 400m', 'L', 'M'),
-    ('IM 400m', 'L', 'F'),
-    ('IM 400m', 'S', 'M'),
-    ('IM 400m', 'S', 'F'),
+    ('IM 400m', 'L', 'M', 'INDIV'),
+    ('IM 400m', 'L', 'F', 'INDIV'),
+    ('IM 400m', 'S', 'M', 'INDIV'),
+    ('IM 400m', 'S', 'F', 'INDIV'),
 
-    ('Freestyle Relay 200m', 'L', 'M'),
-    ('Freestyle Relay 200m', 'L', 'F'),
-    ('Medlay Relay 200m', 'S', 'M'),
-    ('Medlay Relay 200m', 'S', 'F'),
-    ('Freestyle Relay 200m', 'L', 'MIX'),
-    ('Freestyle Relay 200m', 'S', 'MIX'),
-    ('Medlay Relay 200m', 'L', 'MIX'),
-    ('Medlay Relay 200m', 'S', 'MIX'),
+    ('Freestyle Relay 200m', 'L', 'M', 'RELAY'),
+    ('Freestyle Relay 200m', 'L', 'F', 'RELAY'),
+    ('Medlay Relay 200m', 'S', 'M', 'RELAY'),
+    ('Medlay Relay 200m', 'S', 'F', 'RELAY'),
+    ('Mixed Freestyle Relay 200m', 'L', 'MIX', 'RELAY'),
+    ('Mixed Freestyle Relay 200m', 'S', 'MIX', 'RELAY'),
+    ('Mixed Medlay Relay 200m', 'L', 'MIX', 'RELAY'),
+    ('Mixed Medlay Relay 200m', 'S', 'MIX', 'RELAY'),
     
-    ('Freestyle Relay 400m', 'L', 'M'),
-    ('Freestyle Relay 400m', 'L', 'F'),
-    ('Medlay Relay 400m', 'S', 'M'),
-    ('Medlay Relay 400m', 'S', 'F'),
-    ('Freestyle Relay 400m', 'L', 'MIX'),
-    ('Freestyle Relay 400m', 'S', 'MIX'),
-    ('Medlay Relay 400m', 'L', 'MIX'),
-    ('Medlay Relay 400m', 'S', 'MIX')";
+    ('Freestyle Relay 400m', 'L', 'M', 'RELAY'),
+    ('Freestyle Relay 400m', 'L', 'F', 'RELAY'),
+    ('Medlay Relay 400m', 'S', 'M', 'RELAY'),
+    ('Medlay Relay 400m', 'S', 'F', 'RELAY'),
+    ('Mixed Freestyle Relay 400m', 'L', 'MIX', 'RELAY'),
+    ('Mixed Freestyle Relay 400m', 'S', 'MIX', 'RELAY'),
+    ('Mixed Medlay Relay 400m', 'L', 'MIX', 'RELAY'),
+    ('Mixed Medlay Relay 400m', 'S', 'MIX', 'RELAY')";
 
     $stmt = $conn->prepare($insert_sql);
     $stmt->execute();
@@ -176,8 +179,8 @@ try {
             meetName VARCHAR(100) NOT NULL,
             meetDate DATE NOT NULL,
             meetInfo TEXT NOT NULL,
-            external ENUM('Y', 'N'), # Can only be Y or N
-            course ENUM('L', 'S') # Can only be L or S
+            external ENUM('Y', 'N'),
+            course ENUM('L', 'S')
         );"
     );
     $stmt->execute();
@@ -201,7 +204,7 @@ try {
     echo "<br>tblmeetHasEvent created";
 
 
-    // Create Tbl_MeetEventHasSwimmer
+    // Create Tbl_MeetEventHasSwimmer (INDIV results only)
     $stmt = $conn->prepare(
         "CREATE TABLE tblmeetEventHasSwimmer (
             userID INT(6) UNSIGNED,
@@ -217,6 +220,44 @@ try {
     $stmt->execute();
     $stmt->closeCursor();
     echo "<br>tblmeetEventHasSwimmer created";
+
+    // CHANGES FOR RELAY: new tables to store team + members
+    $stmt = $conn->prepare(
+        "CREATE TABLE tblrelayTeam (
+            relayTeamID INT(8) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            meetID INT(6) UNSIGNED NOT NULL,
+            eventID INT(3) UNSIGNED NOT NULL,
+            teamCode VARCHAR(10) NULL,
+            lane TINYINT NULL,
+            totalTime VARCHAR(8) NULL,
+            finalPlace TINYINT NULL,
+            notes TEXT NULL,
+            createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (meetID) REFERENCES tblmeet(meetID) ON DELETE CASCADE,
+            FOREIGN KEY (eventID) REFERENCES tblevent(eventID) ON DELETE CASCADE,
+            UNIQUE KEY uniq_team (meetID, eventID, teamCode)
+        );"
+    );
+    $stmt->execute();
+    $stmt->closeCursor();
+    echo "<br>tblrelayTeam created";
+
+    $stmt = $conn->prepare(
+        "CREATE TABLE tblrelayTeamMember (
+            relayTeamID INT(8) UNSIGNED NOT NULL,
+            userID INT(6) UNSIGNED NOT NULL,
+            leg TINYINT NOT NULL,
+            splitTime VARCHAR(8) NULL,
+            strokeOverride VARCHAR(20) NULL,
+            PRIMARY KEY (relayTeamID, leg),
+            KEY idx_user (userID),
+            FOREIGN KEY (relayTeamID) REFERENCES tblrelayTeam(relayTeamID) ON DELETE CASCADE,
+            FOREIGN KEY (userID) REFERENCES tbluser(userID) ON DELETE CASCADE
+        );"
+    );
+    $stmt->execute();
+    $stmt->closeCursor();
+    echo "<br>tblrelayTeamMember created";
 
     echo "<br>Database created successfully";
 

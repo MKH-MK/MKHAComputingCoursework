@@ -40,7 +40,7 @@ $error_message = '';
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
     try {
-        // IMPORTANT: Do NOT HTML-escape before saving. Just trim/validate.
+        //
         $meetName = isset($_POST["meetName"]) ? trim($_POST["meetName"]) : '';
         $meetDate = isset($_POST["meetDate"]) ? trim($_POST["meetDate"]) : '';
         $meetInfo = isset($_POST["meetInfo"]) ? trim($_POST["meetInfo"]) : '';

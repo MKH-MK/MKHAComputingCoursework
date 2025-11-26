@@ -17,7 +17,7 @@ $navItems = [
         "label" => "Swimmers"
     ], 
     [
-        "link" => "records.php",
+        "link" => "results.php",
         "icon" => '<i class="fas fa-trophy"></i>',
         "label" => "Records"
     ],
