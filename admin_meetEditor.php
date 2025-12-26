@@ -58,7 +58,7 @@ function getMeet(PDO $conn, int $id) {
     return $stmt->fetch(PDO::FETCH_ASSOC);
 }
 function getAllowedEvents(PDO $conn, string $course) {
-    // CHANGES FOR RELAY: include eventType so we can render relay editor
+    // include eventType so we can render relay editor
     $stmt = $conn->prepare("SELECT eventID, eventName, gender, eventType FROM tblevent WHERE course = :c ORDER BY eventID ASC");
     $stmt->bindValue(':c', $course);
     $stmt->execute();
@@ -71,7 +71,7 @@ function getMeetEventIds(PDO $conn, int $meetID) {
     return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
 }
 function getMeetEventsLabeled(PDO $conn, int $meetID) {
-    // CHANGES FOR RELAY: also select eventType for filtering times UI
+    // also select eventType for filtering times UI
     $sql = "SELECT e.eventID, e.eventName, e.gender, e.eventType
             FROM tblevent e
             INNER JOIN tblmeetHasEvent me ON me.eventID = e.eventID
@@ -88,7 +88,7 @@ function getSwimmers(PDO $conn) {
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 function getTimes(PDO $conn, int $meetID) {
-    // unchanged: individual times only
+    // individual times only
     $sql = "SELECT ms.userID, u.forename, u.surname, ms.eventID, e.eventName, e.gender, ms.time
             FROM tblmeetEventHasSwimmer ms
             INNER JOIN tblevent e ON e.eventID = ms.eventID
@@ -101,26 +101,28 @@ function getTimes(PDO $conn, int $meetID) {
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
-// CHANGES FOR RELAY: helpers to list relay teams and members
+// Relay helpers adapted to installed schema (no relayTeamID; one team per event per meet)
 function getRelayTeams(PDO $conn, int $meetID) {
-    $sql = "SELECT rt.relayTeamID, rt.eventID, e.eventName, e.gender, rt.teamCode, rt.lane, rt.totalTime, rt.finalPlace
+    $sql = "SELECT rt.eventID, e.eventName, e.gender, rt.teamName, rt.totalTime
             FROM tblrelayTeam rt
             INNER JOIN tblevent e ON e.eventID = rt.eventID
             WHERE rt.meetID = :m
-            ORDER BY e.eventID ASC, rt.teamCode ASC";
+            ORDER BY e.eventID ASC";
     $stmt = $conn->prepare($sql);
     $stmt->bindValue(':m', $meetID, PDO::PARAM_INT);
     $stmt->execute();
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
-function getRelayMembers(PDO $conn, int $relayTeamID) {
-    $sql = "SELECT m.leg, u.userID, u.forename, u.surname, u.gender, m.splitTime
+function getRelayMembers(PDO $conn, int $meetID, int $eventID) {
+    // removed m.splitTime to match schema without splitTime column
+    $sql = "SELECT m.leg, u.userID, u.forename, u.surname, u.gender
             FROM tblrelayTeamMember m
             INNER JOIN tbluser u ON u.userID = m.userID
-            WHERE m.relayTeamID = :t
+            WHERE m.meetID = :m AND m.eventID = :e
             ORDER BY m.leg ASC";
     $stmt = $conn->prepare($sql);
-    $stmt->bindValue(':t', $relayTeamID, PDO::PARAM_INT);
+    $stmt->bindValue(':m', $meetID, PDO::PARAM_INT);
+    $stmt->bindValue(':e', $eventID, PDO::PARAM_INT);
     $stmt->execute();
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
@@ -182,7 +184,7 @@ if ($meetID && $_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($action === 'add_time' || $action === 'update_time') {
-            // unchanged individual time handler
+            // individual time handler
             $eventID = isset($_POST['eventID']) ? (int)$_POST['eventID'] : 0;
             $userID  = isset($_POST['userID']) ? (int)$_POST['userID'] : 0;
             $time    = isset($_POST['time']) ? trim($_POST['time']) : '';
@@ -221,7 +223,7 @@ if ($meetID && $_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($action === 'delete_time') {
-            // unchanged individual delete
+            // individual delete
             $eventID = isset($_POST['eventID']) ? (int)$_POST['eventID'] : 0;
             $userID  = isset($_POST['userID']) ? (int)$_POST['userID'] : 0;
             if ($eventID <= 0 || $userID <= 0) throw new Exception("Invalid delete request.");
@@ -235,15 +237,15 @@ if ($meetID && $_SERVER['REQUEST_METHOD'] === 'POST') {
             $messages[] = "Time removed.";
         }
 
-        // CHANGES FOR RELAY: create/update/delete relay team
+        // Relay: create/update/delete adapted to installed schema (no relayTeamID)
         if ($action === 'create_relay') {
             $eventID = isset($_POST['relay_eventID']) ? (int)$_POST['relay_eventID'] : 0;
-            $teamCode = isset($_POST['teamCode']) ? trim($_POST['teamCode']) : '';
-            $lane = isset($_POST['lane']) ? (int)$_POST['lane'] : null;
+            // read team name directly
+            $teamName = isset($_POST['teamName']) ? trim($_POST['teamName']) : '';
             $totalTime = isset($_POST['totalTime']) ? trim($_POST['totalTime']) : '';
 
-            if ($eventID <= 0 || $teamCode === '' || $totalTime === '') {
-                throw new Exception("Relay event, team code, and total time are required.");
+            if ($eventID <= 0 || $teamName === '' || $totalTime === '') {
+                throw new Exception("Relay event, team name, and total time are required.");
             }
 
             // Ensure event is attached and is relay
@@ -254,45 +256,50 @@ if ($meetID && $_SERVER['REQUEST_METHOD'] === 'POST') {
             $etype = $chk->fetchColumn();
             if ($etype !== 'RELAY') throw new Exception("Selected event is not a relay.");
 
-            // Create team
-            $ins = $conn->prepare("INSERT INTO tblrelayTeam (meetID, eventID, teamCode, lane, totalTime) VALUES (:m,:e,:c,:l,:t)");
+            // Create or update team (PK is meetID+eventID)
+            $ins = $conn->prepare("INSERT INTO tblrelayTeam (meetID, eventID, teamName, totalTime) 
+                                   VALUES (:m,:e,:n,:t)
+                                   ON DUPLICATE KEY UPDATE teamName = VALUES(teamName), totalTime = VALUES(totalTime)");
             $ins->bindValue(':m', $meetID, PDO::PARAM_INT);
             $ins->bindValue(':e', $eventID, PDO::PARAM_INT);
-            $ins->bindValue(':c', $teamCode);
-            $ins->bindValue(':l', $lane);
+            $ins->bindValue(':n', $teamName);
             $ins->bindValue(':t', $totalTime);
             $ins->execute();
 
-            $messages[] = "Relay team created. Add members below.";
+            $messages[] = "Relay team saved. Add members below.";
         }
 
         if ($action === 'add_member') {
-            $relayTeamID = isset($_POST['relayTeamID']) ? (int)$_POST['relayTeamID'] : 0;
+            $eventID = isset($_POST['relay_eventID']) ? (int)$_POST['relay_eventID'] : 0;
             $userID  = isset($_POST['member_userID']) ? (int)$_POST['member_userID'] : 0;
             $leg     = isset($_POST['member_leg']) ? (int)$_POST['member_leg'] : 0;
-            $split   = isset($_POST['member_split']) ? trim($_POST['member_split']) : '';
+            // split field removed from DB; ignore any provided split
+            // $split   = isset($_POST['member_split']) ? trim($_POST['member_split']) : '';
 
-            if ($relayTeamID <= 0 || $userID <= 0 || $leg <= 0) {
-                throw new Exception("Relay team, user, and leg are required.");
+            if ($eventID <= 0 || $userID <= 0 || $leg <= 0) {
+                throw new Exception("Relay event, user, and leg are required.");
             }
 
-            // Insert member (leg unique per team)
-            $ins = $conn->prepare("INSERT INTO tblrelayTeamMember (relayTeamID, userID, leg, splitTime) VALUES (:t,:u,:l,:s)");
-            $ins->bindValue(':t', $relayTeamID, PDO::PARAM_INT);
+            // Insert/Update member (leg unique per meet+event)
+            $ins = $conn->prepare("INSERT INTO tblrelayTeamMember (meetID, eventID, userID, leg) 
+                                   VALUES (:m,:e,:u,:l)
+                                   ON DUPLICATE KEY UPDATE userID = VALUES(userID)");
+            $ins->bindValue(':m', $meetID, PDO::PARAM_INT);
+            $ins->bindValue(':e', $eventID, PDO::PARAM_INT);
             $ins->bindValue(':u', $userID, PDO::PARAM_INT);
             $ins->bindValue(':l', $leg, PDO::PARAM_INT);
-            $ins->bindValue(':s', $split);
             $ins->execute();
 
-            $messages[] = "Relay member added.";
+            $messages[] = "Relay member saved.";
         }
 
         if ($action === 'delete_relay') {
-            $relayTeamID = isset($_POST['relayTeamID']) ? (int)$_POST['relayTeamID'] : 0;
-            if ($relayTeamID <= 0) throw new Exception("Invalid relay delete request.");
+            $eventID = isset($_POST['relay_eventID']) ? (int)$_POST['relay_eventID'] : 0;
+            if ($eventID <= 0) throw new Exception("Invalid relay delete request.");
 
-            $del = $conn->prepare("DELETE FROM tblrelayTeam WHERE relayTeamID = :t");
-            $del->bindValue(':t', $relayTeamID, PDO::PARAM_INT);
+            $del = $conn->prepare("DELETE FROM tblrelayTeam WHERE meetID = :m AND eventID = :e");
+            $del->bindValue(':m', $meetID, PDO::PARAM_INT);
+            $del->bindValue(':e', $eventID, PDO::PARAM_INT);
             $del->execute();
 
             $messages[] = "Relay team deleted.";
@@ -313,7 +320,7 @@ $meetEventsForTimes = $meetID ? getMeetEventsLabeled($conn, $meetID) : [];
 $swimmers = getSwimmers($conn);
 $times = $meetID ? getTimes($conn, $meetID) : [];
 
-// CHANGES FOR RELAY: list relay teams for this meet
+// Relay teams for this meet
 $relayTeams = $meetID ? getRelayTeams($conn, $meetID) : [];
 
 // Build swimmer options for JS (id, label, gender)
@@ -333,6 +340,7 @@ $swimmerOptions = array_map(function($sw) {
     <title>Oundle School Swim Team - Meet Editor</title>
     <meta name="viewport" content="width=1024, initial-scale=1">
     <link rel="stylesheet" href="style.css">
+
 </head>
 <body>
 <?php include 'navbar.php'; ?>
@@ -500,7 +508,7 @@ $swimmerOptions = array_map(function($sw) {
         </div>
     </div>
 
-    <!-- CHANGES FOR RELAY: Relay Teams editor -->
+    <!-- Relay Teams editor adapted to installed schema -->
     <div class="section">
         <h2>Relay Teams</h2>
 
@@ -521,8 +529,8 @@ $swimmerOptions = array_map(function($sw) {
                     <?php endforeach; ?>
                 </select>
 
-                <input type="text" name="teamCode" class="student-select" placeholder="Team Code (e.g. A)" required>
-                <input type="number" name="lane" class="student-select" placeholder="Lane (optional)">
+                <!-- input now uses teamName -->
+                <input type="text" name="teamName" class="student-select" placeholder="Team Name" required>
                 <input type="text" name="totalTime" class="time-input" placeholder="Total Time mm:ss.ss" maxlength="8" required>
                 <button type="submit" class="btn">Create</button>
             </form>
@@ -547,15 +555,15 @@ $swimmerOptions = array_map(function($sw) {
                     <?php foreach ($relayTeams as $rt): ?>
                         <tr>
                             <td><?= htmlspecialchars($rt['eventName'] . ' (' . $rt['gender'] . ')') ?></td>
-                            <td><?= htmlspecialchars($rt['teamCode']) ?></td>
+                            <td><?= htmlspecialchars($rt['teamName'] ?? '') ?></td>
                             <td><?= htmlspecialchars($rt['totalTime'] ?? '') ?></td>
                             <td>
-                                <?php $members = getRelayMembers($conn, (int)$rt['relayTeamID']); ?>
+                                <?php $members = getRelayMembers($conn, (int)$meet['meetID'], (int)$rt['eventID']); ?>
                                 <?php if (empty($members)): ?>
                                     <em>No members yet.</em>
                                 <?php else: ?>
                                     <?php foreach ($members as $m): ?>
-                                        <div><?= (int)$m['leg'] ?>) <?= htmlspecialchars($m['surname'] . ', ' . $m['forename']) ?> <?= htmlspecialchars($m['splitTime'] ?? '') ?></div>
+                                        <div><?= (int)$m['leg'] ?>) <?= htmlspecialchars($m['surname'] . ', ' . $m['forename']) ?></div>
                                     <?php endforeach; ?>
                                 <?php endif; ?>
 
@@ -563,7 +571,7 @@ $swimmerOptions = array_map(function($sw) {
                                 <form method="post" class="inline-form mt-12">
                                     <input type="hidden" name="action" value="add_member">
                                     <input type="hidden" name="meetID" value="<?= (int)$meet['meetID'] ?>">
-                                    <input type="hidden" name="relayTeamID" value="<?= (int)$rt['relayTeamID'] ?>">
+                                    <input type="hidden" name="relay_eventID" value="<?= (int)$rt['eventID'] ?>">
 
                                     <select name="member_userID" class="student-select" required>
                                         <option value="">Select swimmer</option>
@@ -575,7 +583,7 @@ $swimmerOptions = array_map(function($sw) {
                                     </select>
 
                                     <input type="number" name="member_leg" class="student-select" placeholder="Leg (1-4)" min="1" max="4" required>
-                                    <input type="text" name="member_split" class="time-input" placeholder="Split (optional)" maxlength="8">
+                                    <!-- split input removed to match schema without splitTime -->
                                     <button type="submit" class="btn">Add Member</button>
                                 </form>
                             </td>
@@ -583,7 +591,7 @@ $swimmerOptions = array_map(function($sw) {
                                 <form method="post" class="inline-form">
                                     <input type="hidden" name="action" value="delete_relay">
                                     <input type="hidden" name="meetID" value="<?= (int)$meet['meetID'] ?>">
-                                    <input type="hidden" name="relayTeamID" value="<?= (int)$rt['relayTeamID'] ?>">
+                                    <input type="hidden" name="relay_eventID" value="<?= (int)$rt['eventID'] ?>">
                                     <button type="submit" class="btn btn-danger">Delete Team</button>
                                 </form>
                             </td>

@@ -4,6 +4,7 @@ session_start();
 /* Access control: only allow logged-in users with role >= 1 (exclude guests / role 0) */
 if (!isset($_SESSION['role']) || (int)$_SESSION['role'] < 1) {
     echo '<!DOCTYPE html>
+
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -11,18 +12,26 @@ if (!isset($_SESSION['role']) || (int)$_SESSION['role'] < 1) {
     <meta name="viewport" content="width=1024, initial-scale=1">
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
     <div class="main-content">
-        <div class="page-title">Access Denied</div>
+        <div class="page-title">
+            Access Denied
+        </div>
         <div class="section">
-            <div class="alert-fail">Permission Error: You do not have sufficient privileges to view this page.</div>
+            <div class="alert-fail">
+                Permision Error: You are not logged in or do not have the right privilage to access this page
+            </div>
+            <h2>Further options:</h2>
             <ul>
+                <li>If you think this is an error, please <a href="contact.php">contact the administrator</a>.
                 <li><a href="login.php">Login</a></li>
                 <li><a href="index.php">Return to Home</a></li>
             </ul>
         </div>
     </div>
 </body>
+
 </html>';
     exit();
 }
@@ -220,7 +229,7 @@ $eventNamesOrdered = array_filter($installOrder, fn($n) => stripos($n, 'Relay') 
         </div>
     </div>
 
-    <!-- PERSONAL BESTS (INDIV only) -->
+    <!-- PERSONAL BESTS (INDIV only) — dates removed as requested -->
     <div class="section">
         <h2>Personal Bests</h2>
         <div class="table-wrap">
@@ -229,9 +238,7 @@ $eventNamesOrdered = array_filter($installOrder, fn($n) => stripos($n, 'Relay') 
                     <tr>
                         <th>Event</th>
                         <th>Short Course PB</th>
-                        <th>SC Date</th>
                         <th>Long Course PB</th>
-                        <th>LC Date</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -239,9 +246,7 @@ $eventNamesOrdered = array_filter($installOrder, fn($n) => stripos($n, 'Relay') 
                     <tr>
                         <td><?= h($ename) ?></td>
                         <td><?= h($events[$ename]['short'] ?? '') ?></td>
-                        <td><?= h($events[$ename]['short_date'] ?? '') ?></td>
                         <td><?= h($events[$ename]['long'] ?? '') ?></td>
-                        <td><?= h($events[$ename]['long_date'] ?? '') ?></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
@@ -284,11 +289,11 @@ $eventNamesOrdered = array_filter($installOrder, fn($n) => stripos($n, 'Relay') 
 
     <!-- EXTRA SUPPORT SECTION -->
     <div class="section">
-        <h2>Support</h2>
+        <h2>Need Help?</h2>
         <div class="extra-section">
             Any issues with your account or results?
             <br>
-            <a href="contact.php">Contact the administrator</a>
+            <a href="tools.php">Contact the administrator</a>
         </div>
     </div>
 </div>

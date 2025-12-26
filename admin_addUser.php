@@ -1,7 +1,6 @@
 <?php
 session_start();
 if (!isset($_SESSION['role']) || $_SESSION['role'] != 2) {
-    // Show error message and do not load the admin page content
     echo '<!DOCTYPE html>
 
 <html lang="en">
@@ -42,75 +41,56 @@ $error_message = '';
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
     try {
-        // Keep basic like swimmerSignup: escape POST values up-front, no trims, no CSRF tokens.
+        
         $_POST = array_map("htmlspecialchars", $_POST);
 
-        // Full set of validations using $_POST directly (no local assignments)
-        if (($_POST["forename"] ?? '') === '' || ($_POST["surname"] ?? '') === '') {
-            throw new Exception("Forename and surname are required.");
-        }
+        $email = trim($_POST["email"] ?? '');
+        $passwd = $_POST["passwd"] ?? '';
+        $confirm = $_POST["confirm_passwd"] ?? '';
+        $description = $_POST["description"] ?? '';
+        $role = isset($_POST["role"]) ? (int)$_POST["role"] : 1; // default to Student if missing
 
-        if (!filter_var($_POST["email"] ?? '', FILTER_VALIDATE_EMAIL)) {
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             throw new Exception("Invalid email format.");
         }
-
-        if (substr_count($_POST["email"], '@') !== 1) {
-            throw new Exception("Invalid email format");
-        }
-
-        if (substr($_POST["email"], -20) !== "@oundleschool.org.uk") {
+        if (substr($email, -20) !== "@oundleschool.org.uk") {
             throw new Exception("Email must be a valid school email address");
         }
-
-        if (!in_array($_POST["gender"] ?? '', ['M','F','MIX'], true)) {
-            throw new Exception("Please select a valid gender.");
+        if (substr_count($email, '@') !== 1) {
+            throw new Exception("Invalid email format");
         }
-
-        if ((int)($_POST["yearg"] ?? 0) < 7 || (int)($_POST["yearg"] ?? 0) > 13) {
-            throw new Exception("Year group must be between 7 and 13.");
-        }
-
-        if (!isset($_POST["role"]) || !in_array((int)$_POST["role"], [0,1,2], true)) {
-            throw new Exception("Invalid role selected.");
-        }
-
-        if (($_POST["passwd"] ?? '') === '' || ($_POST["confirm_passwd"] ?? '') === '') {
-            throw new Exception("Password and confirmation are required.");
-        }
-
-        if (($_POST["passwd"] ?? '') !== ($_POST["confirm_passwd"] ?? '')) {
+        if ($passwd !== $confirm) {
             throw new Exception("Passwords do not match.");
         }
-
-        if (strlen($_POST["description"] ?? '') > 400) {
+        if (strlen($description) > 400) {
             throw new Exception("Description cannot exceed 400 characters.");
         }
 
-        $userName = substr($_POST["email"], 0, strpos($_POST["email"], '@'));
-        $hashed_password = password_hash($_POST["passwd"], PASSWORD_DEFAULT);
+        $userName = substr($email, 0, strpos($email, '@'));
+        $hashed_password = password_hash($passwd, PASSWORD_DEFAULT);
 
-        // Check if email already exists
+        // Uniqueness check (keep this to avoid duplicate accounts)
         $email_check = $conn->prepare("SELECT COUNT(*) FROM tbluser WHERE emailAddress = :email");
-        $email_check->bindParam(':email', $_POST["email"]);
+        $email_check->bindParam(':email', $email);
         $email_check->execute();
         if ($email_check->fetchColumn() > 0) {
             throw new Exception("An account already exists with this email.");
         }
 
-        // Insert user
+        // Insert user (rely on HTML constraints for required fields and ranges)
         $stmt = $conn->prepare("INSERT INTO tbluser 
             (userID, passwd, role, surname, forename, yearg, emailAddress, userName, gender, description)
             VALUES (null, :passwd, :role, :surname, :forename, :yearg, :emailAddress, :userName, :gender, :description)");
 
         $stmt->bindParam(':passwd', $hashed_password);
-        $stmt->bindParam(':role', $_POST["role"], PDO::PARAM_INT); 
+        $stmt->bindParam(':role', $role, PDO::PARAM_INT);
         $stmt->bindParam(':surname', $_POST["surname"]);
         $stmt->bindParam(':forename', $_POST["forename"]);
-        $stmt->bindParam(':yearg', $_POST["yearg"], PDO::PARAM_INT);  
-        $stmt->bindParam(':emailAddress', $_POST["email"]);  
-        $stmt->bindParam(':userName', $userName); 
+        $stmt->bindParam(':yearg', $_POST["yearg"], PDO::PARAM_INT);
+        $stmt->bindParam(':emailAddress', $email);
+        $stmt->bindParam(':userName', $userName);
         $stmt->bindParam(':gender', $_POST["gender"]);
-        $stmt->bindParam(':description', $_POST["description"]);
+        $stmt->bindParam(':description', $description);
 
         $stmt->execute();
 

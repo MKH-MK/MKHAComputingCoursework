@@ -224,18 +224,15 @@ try {
     // CHANGES FOR RELAY: new tables to store team + members
     $stmt = $conn->prepare(
         "CREATE TABLE tblrelayTeam (
-            relayTeamID INT(8) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             meetID INT(6) UNSIGNED NOT NULL,
             eventID INT(3) UNSIGNED NOT NULL,
-            teamCode VARCHAR(10) NULL,
-            lane TINYINT NULL,
+            teamName VARCHAR(20) NULL,
             totalTime VARCHAR(8) NULL,
-            finalPlace TINYINT NULL,
             notes TEXT NULL,
-            createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+                
+            PRIMARY KEY (meetID, eventID),
             FOREIGN KEY (meetID) REFERENCES tblmeet(meetID) ON DELETE CASCADE,
-            FOREIGN KEY (eventID) REFERENCES tblevent(eventID) ON DELETE CASCADE,
-            UNIQUE KEY uniq_team (meetID, eventID, teamCode)
+            FOREIGN KEY (eventID) REFERENCES tblevent(eventID) ON DELETE CASCADE
         );"
     );
     $stmt->execute();
@@ -244,14 +241,14 @@ try {
 
     $stmt = $conn->prepare(
         "CREATE TABLE tblrelayTeamMember (
-            relayTeamID INT(8) UNSIGNED NOT NULL,
+            meetID INT(6) UNSIGNED NOT NULL,
+            eventID INT(3) UNSIGNED NOT NULL,
             userID INT(6) UNSIGNED NOT NULL,
             leg TINYINT NOT NULL,
-            splitTime VARCHAR(8) NULL,
-            strokeOverride VARCHAR(20) NULL,
-            PRIMARY KEY (relayTeamID, leg),
+
+            PRIMARY KEY (meetID, eventID, leg),
             KEY idx_user (userID),
-            FOREIGN KEY (relayTeamID) REFERENCES tblrelayTeam(relayTeamID) ON DELETE CASCADE,
+            FOREIGN KEY (meetID, eventID) REFERENCES tblrelayTeam(meetID, eventID) ON DELETE CASCADE,
             FOREIGN KEY (userID) REFERENCES tbluser(userID) ON DELETE CASCADE
         );"
     );
