@@ -1,6 +1,9 @@
 <?php
 session_start();
-//$_SESSION['username'] = '';
+include_once('connection.php');
+include_once('auth.php');
+enforceSessionPolicies($conn);
+
 ?>
 
 <!DOCTYPE html>

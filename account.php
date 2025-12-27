@@ -1,5 +1,8 @@
 <?php
 session_start();
+include_once('connection.php');
+include_once('auth.php');
+enforceSessionPolicies($conn);
 
 /* Access control: only allow logged-in users with role >= 1 (exclude guests / role 0) */
 if (!isset($_SESSION['role']) || (int)$_SESSION['role'] < 1) {

@@ -1,5 +1,8 @@
 <?php
 session_start();
+include_once('connection.php');
+include_once('auth.php');
+enforceSessionPolicies($conn);
 
 $_SESSION = array();
 

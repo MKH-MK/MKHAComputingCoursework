@@ -1,5 +1,9 @@
 <?php
 session_start();
+include_once('connection.php');
+include_once('auth.php');
+enforceSessionPolicies($conn);
+
 if (!isset($_SESSION['role']) || $_SESSION['role'] != 2) {
     // Show error message and do not load the admin page content
     echo '<!DOCTYPE html>
@@ -92,7 +96,7 @@ $roleFilters = [];
 if (isset($_GET['role_0']) || isset($_GET['role_1']) || isset($_GET['role_2'])) {
     if (isset($_GET['role_0'])) $roleFilters[] = 0;
     if (isset($_GET['role_1'])) $roleFilters[] = 1;
-    if (isset($_GET['role_2'])) $roleFilters[] = 2;
+    if (isset($_GET['role_2'])) $roleFilters[] = 2; 
 } else {
     $roleFilters = [0,1,2]; // default: all
 }
@@ -149,11 +153,11 @@ $whereSql = empty($where) ? '' : ('WHERE ' . implode(' AND ', $where));
 
 // Total count
 $countSql = "SELECT COUNT(*) FROM tbluser $whereSql";
-$stmt = $conn->prepare($countSql);
+$stmt = $conn->prepare($countSql);  
 foreach ($params as $k => $v) $stmt->bindValue($k, $v);
 $stmt->execute();
-$totalRows = (int)$stmt->fetchColumn();
 
+$totalRows = (int)$stmt->fetchColumn();
 $totalPages = max(1, (int)ceil($totalRows / $perPage));
 $page = min($page, $totalPages);
 $offset = ($page - 1) * $perPage;

@@ -1,7 +1,13 @@
 <?php
 session_start();
+include_once('connection.php');
+include_once('auth.php');
+
+// Auto-logout on idle and force re-login if role changed mid-session
+enforceSessionPolicies($conn);
+
+// Keep your existing denied access block
 if (!isset($_SESSION['role']) || $_SESSION['role'] != 2) {
-    // Show error message and do not load the admin page content
     echo '<!DOCTYPE html>
 
 <html lang="en">

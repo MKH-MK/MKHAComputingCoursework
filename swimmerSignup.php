@@ -1,5 +1,8 @@
 <?php
-include_once("connection.php");
+include_once('connection.php');
+include_once('auth.php');
+enforceSessionPolicies($conn);
+
 $registration_success = false;
 $error_message = '';
 

@@ -1,5 +1,9 @@
 <?php
 session_start();
+include_once('connection.php');
+include_once('auth.php');
+enforceSessionPolicies($conn);
+
 if (!isset($_SESSION['role']) || $_SESSION['role'] != 2) {
     // unchanged access check
     echo '<!DOCTYPE html>

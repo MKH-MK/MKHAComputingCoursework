@@ -1,6 +1,9 @@
 <?php
 session_start();
-include_once("connection.php");
+include_once('connection.php');
+include_once('auth.php');
+enforceSessionPolicies($conn);
+
 
 /* CHANGES FOR RELAY: records page supports INDIV and RELAY by selecting event from tblevent (with eventType set).
    Follow existing patterns: toolbars, filters, pagination like admin_meetList.php.
