@@ -44,8 +44,6 @@ if (isset($_GET['edit']) && ctype_digit((string)$_GET['edit'])) {
     exit;
 }
 
-include_once("connection.php");
-
 // CSRF token for destructive actions
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));

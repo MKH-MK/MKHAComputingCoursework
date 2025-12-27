@@ -39,8 +39,6 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] != 2) {
     exit();
 }
 
-include_once("connection.php");
-
 $messages = [];
 $errors = [];
 

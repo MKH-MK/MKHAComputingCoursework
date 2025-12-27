@@ -39,7 +39,6 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] != 2) {
     exit();
 }
 
-include_once("connection.php");
 $error_message = '';
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {

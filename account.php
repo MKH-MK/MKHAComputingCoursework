@@ -39,8 +39,6 @@ if (!isset($_SESSION['role']) || (int)$_SESSION['role'] < 1) {
     exit();
 }
 
-require_once 'connection.php';
-
 /* Fetch logged-in user record */
 $userRow = null;
 if (isset($_SESSION['userName'])) {

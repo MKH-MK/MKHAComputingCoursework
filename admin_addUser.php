@@ -38,8 +38,6 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] != 2) {
     exit();
 }
 
-include_once("connection.php");
-
 $registration_success = false;
 $error_message = '';
 

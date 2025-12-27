@@ -18,21 +18,37 @@ function enforceSessionPolicies(PDO $conn): void {
     }
     $_SESSION['last_activity'] = $now;
 
-    // Role change check 
-    if (!empty($_SESSION['userID']) && isset($_SESSION['role'])) {
-        $stmt = $conn->prepare('SELECT role FROM tbluser WHERE userID = :id LIMIT 1');
-        $stmt->bindValue(':id', (int)$_SESSION['userID'], PDO::PARAM_INT);
-        $stmt->execute();
-        $dbRole = $stmt->fetchColumn();
+    // Role sync: prefer userID; fall back to userName if needed
+    $dbRole = null;
 
-        if ($dbRole === false) {
-            // User removed; logout
-            logout();
+    if (!empty($_SESSION['userID'])) {
+        $st = $conn->prepare('SELECT role FROM tbluser WHERE userID = :id LIMIT 1');
+        $st->bindValue(':id', (int)$_SESSION['userID'], PDO::PARAM_INT);
+        $st->execute();
+        $dbRole = $st->fetchColumn();
+    } elseif (!empty($_SESSION['userName'])) {
+        $st = $conn->prepare('SELECT role, userID FROM tbluser WHERE userName = :uname LIMIT 1');
+        $st->bindValue(':uname', $_SESSION['userName'], PDO::PARAM_STR);
+        $st->execute();
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+        if ($row) {
+            $dbRole = $row['role'];
+            // Backfill userID for future checks
+            $_SESSION['userID'] = (int)$row['userID'];
         }
+    }
 
-        if ((int)$dbRole !== (int)$_SESSION['role']) {
-            // Any role change (demote or promote) forces re-login
-            logout();
+    if ($dbRole === false) {
+        // User removed; logout
+        logout();
+    }
+
+    if ($dbRole !== null) {
+        $dbRoleInt = (int)$dbRole;
+        if (!isset($_SESSION['role']) || (int)$_SESSION['role'] !== $dbRoleInt) {
+            // Always sync session role to match DB; regenerate session id for safety
+            $_SESSION['role'] = $dbRoleInt;
+            session_regenerate_id(true);
         }
     }
 }
