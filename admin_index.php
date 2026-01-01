@@ -70,6 +70,7 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] != 2) {
             <ul>
                 <li><a href="admin_addUser.php">Add Users</a></li>
                 <li><a href="admin_userList.php">Users List</a></li>
+                <li><a href="admin_rollOverUser.php">Roll Over Users</a></li>
             </ul>
 
         </div>

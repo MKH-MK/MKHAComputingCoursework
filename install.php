@@ -205,12 +205,14 @@ try {
 
 
     // Create Tbl_MeetEventHasSwimmer (INDIV results only)
+    // CHANGE: added yeargAtEvent to snapshot the swimmer's year at the time of result creation
     $stmt = $conn->prepare(
         "CREATE TABLE tblmeetEventHasSwimmer (
             userID INT(6) UNSIGNED,
             meetID INT(6) UNSIGNED,
             eventID INT(3) UNSIGNED,
             time VARCHAR(8),
+            yeargAtEvent INT(2) NOT NULL,
 
             PRIMARY KEY (userID, meetID, eventID),
             FOREIGN KEY (meetID, eventID) REFERENCES tblmeetHasEvent(meetID, eventID) ON DELETE CASCADE,
@@ -255,6 +257,24 @@ try {
     $stmt->execute();
     $stmt->closeCursor();
     echo "<br>tblrelayTeamMember created";
+
+    // System settings: annual rollover guard (last_rollover_year + timestamp)
+    $stmt = $conn->prepare(
+        "CREATE TABLE IF NOT EXISTS tblsystem (
+            syskey VARCHAR(50) PRIMARY KEY,
+            sysvalue VARCHAR(50) NOT NULL
+        );"
+    );
+    $stmt->execute();
+    $stmt->closeCursor();
+    echo "<br>tblsystem created";
+
+    $stmt = $conn->prepare("INSERT IGNORE INTO tblsystem (syskey, sysvalue) VALUES
+        ('last_rollover_year','0'),
+        ('last_rollover_at','')");
+    $stmt->execute();
+    $stmt->closeCursor();
+    echo "<br>tblsystem populated";
 
     echo "<br>Database created successfully";
 

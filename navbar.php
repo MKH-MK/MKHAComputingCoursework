@@ -7,22 +7,22 @@ $navItems = [
         "label" => "Home"
     ],
     [
-        "link" => "meets.php",
+        "link" => "meet.php",
         "icon" => '<i class="fas fa-swimmer"></i>',
         "label" => "Meets"
     ],
     [
-        "link" => "swimmers.php",
+        "link" => "swimmer.php",
         "icon" => '<i class="fas fa-user"></i>',
         "label" => "Swimmers"
     ], 
     [
-        "link" => "results.php",
+        "link" => "record.php",
         "icon" => '<i class="fas fa-trophy"></i>',
         "label" => "Records"
     ],
     [
-        "link" => "tools.php",
+        "link" => "tool.php",
         "icon" => '<i class="fas fa-wrench"></i>',
         "label" => "Tools"
     ],

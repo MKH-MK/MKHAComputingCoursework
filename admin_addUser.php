@@ -51,6 +51,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $confirm = $_POST["confirm_passwd"] ?? '';
         $description = $_POST["description"] ?? '';
         $role = isset($_POST["role"]) ? (int)$_POST["role"] : 1; // default to Student if missing
+        $yearg = isset($_POST["yearg"]) ? (int)$_POST["yearg"] : 0;
 
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             throw new Exception("Invalid email format.");
@@ -66,6 +67,17 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         }
         if (strlen($description) > 400) {
             throw new Exception("Description cannot exceed 400 characters.");
+        }
+
+        // Role-based year group validation
+        if ($role === 2) { // Staff/Admin
+            if ($yearg !== 0) throw new Exception("Staff/Admin must have Year Group = 0.");
+        } elseif ($role === 1) { // Student
+            if ($yearg < 7 || $yearg > 13) throw new Exception("Students must have Year Group between 7 and 13.");
+        } elseif ($role === 0) { // Guest
+            if ($yearg !== 0) throw new Exception("Guests must have Year Group = 0.");
+        } else {
+            throw new Exception("Invalid role selected.");
         }
 
         $userName = substr($email, 0, strpos($email, '@'));
@@ -88,7 +100,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $stmt->bindParam(':role', $role, PDO::PARAM_INT);
         $stmt->bindParam(':surname', $_POST["surname"]);
         $stmt->bindParam(':forename', $_POST["forename"]);
-        $stmt->bindParam(':yearg', $_POST["yearg"], PDO::PARAM_INT);
+        $stmt->bindParam(':yearg', $yearg, PDO::PARAM_INT);
         $stmt->bindParam(':emailAddress', $email);
         $stmt->bindParam(':userName', $userName);
         $stmt->bindParam(':gender', $_POST["gender"]);
@@ -147,7 +159,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 </div>
 
                 <div class="form-row form-row--center">
-                    <input type="number" name="yearg" class="input-small" placeholder="Year Group" min="7" max="13" required>
+                    <!-- CHANGE: allow 0 for Staff/Admin -->
+                    <input type="number" name="yearg" class="input-small" placeholder="Year Group" min="0" max="13" required>
                     <select name="gender" class="input-small" required>
                         <option value="" disabled selected>Gender</option>
                         <option value="M">Male</option>

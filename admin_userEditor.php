@@ -98,12 +98,16 @@ if ($userID) {
                 throw new Exception("Please select a valid gender.");
             }
 
-            if ($yearg < 7 || $yearg > 13) {
-                throw new Exception("Year group must be between 7 and 13.");
-            }
-
+            // CHANGE: Role-based year group validation
             if (!in_array($role, [0,1,2], true)) {
                 throw new Exception("Invalid role selected.");
+            }
+            if ($role === 2) { // Coach/Admin
+                if ($yearg !== 0) throw new Exception("Staff/Admin must have Year Group = 0.");
+            } elseif ($role === 1) { // Student
+                if ($yearg < 7 || $yearg > 13) throw new Exception("Students must have Year Group between 7 and 13.");
+            } elseif ($role === 0) { // Guest
+                if ($yearg !== 0) throw new Exception("Guests must have Year Group = 0.");
             }
 
             if (strlen($description) > 400) {
@@ -230,7 +234,8 @@ if ($userID) {
                 </div>
 
                 <div class="form-row form-row--center">
-                    <input type="number" name="yearg" class="input-small" placeholder="Year Group" min="7" max="13" required value="<?= (int)$user['yearg'] ?>">
+                    <!-- CHANGE: allow 0 for Staff/Admin and Guest -->
+                    <input type="number" name="yearg" class="input-small" placeholder="Year Group" min="0" max="13" required value="<?= (int)$user['yearg'] ?>">
                     <select name="gender" class="input-small" required>
                         <option value="" disabled>Gender</option>
                         <option value="M" <?= $user['gender']==='M'?'selected':'' ?>>Male</option>

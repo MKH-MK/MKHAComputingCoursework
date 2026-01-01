@@ -53,6 +53,52 @@ if (isset($_GET['edit']) && ctype_digit((string)$_GET['edit'])) {
 }
 
 // Helpers
+
+// Time normalization helpers: parse flexible input -> centiseconds; format -> canonical MM:SS.hh
+function parseTimeToCentiseconds(string $raw): ?int {
+    $s = trim(str_replace(',', '.', $raw));
+    if ($s === '') return null;
+
+    $minutes = 0;
+    $secPart = $s;
+
+    // Minutes optional
+    if (strpos($s, ':') !== false) {
+        [$mStr, $secPart] = explode(':', $s, 2);
+        if ($mStr === '' || !ctype_digit($mStr)) return null;
+        $minutes = (int)$mStr;
+        if ($minutes < 0) return null;
+    }
+
+    // Seconds + hundredths
+    $seconds = 0;
+    $hundredths = 0;
+    if (strpos($secPart, '.') !== false) {
+        [$secStr, $fracStr] = explode('.', $secPart, 2);
+        if ($secStr === '' || !ctype_digit($secStr)) return null;
+        if ($fracStr === '' || !ctype_digit($fracStr)) return null;
+        $seconds = (int)$secStr;
+        // Use first two digits; pad single digit like ".3" -> ".30"
+        $hundredths = (int)substr($fracStr, 0, 2);
+        if (strlen($fracStr) === 1) $hundredths *= 10;
+    } else {
+        if ($secPart === '' || !ctype_digit($secPart)) return null;
+        $seconds = (int)$secPart;
+    }
+
+    if ($seconds < 0 || $seconds > 59) return null;
+
+    return ($minutes * 60 + $seconds) * 100 + $hundredths;
+}
+function formatCentiseconds(int $cs): string {
+    if ($cs < 0) $cs = 0;
+    $m = intdiv($cs, 6000);
+    $rem = $cs % 6000;
+    $s = intdiv($rem, 100);
+    $h = $rem % 100;
+    return sprintf('%02d:%02d.%02d', $m, $s, $h);
+}
+
 function getMeet(PDO $conn, int $id) {
     $stmt = $conn->prepare("SELECT meetID, meetName, meetDate, meetInfo, external, course FROM tblmeet WHERE meetID = :id");
     $stmt->bindValue(':id', $id, PDO::PARAM_INT);
@@ -85,13 +131,15 @@ function getMeetEventsLabeled(PDO $conn, int $meetID) {
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 function getSwimmers(PDO $conn) {
-    $stmt = $conn->prepare("SELECT userID, forename, surname, userName, gender FROM tbluser WHERE role = 1 ORDER BY surname, forename");
+    // include yearg to allow auto-fill of year-at-event in UI
+    $stmt = $conn->prepare("SELECT userID, forename, surname, userName, gender, yearg FROM tbluser WHERE role = 1 ORDER BY surname, forename");
     $stmt->execute();
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 function getTimes(PDO $conn, int $meetID) {
     // individual times only
-    $sql = "SELECT ms.userID, u.forename, u.surname, ms.eventID, e.eventName, e.gender, ms.time
+    // include ms.yeargAtEvent so admin can view/edit snapshot year group
+    $sql = "SELECT ms.userID, u.forename, u.surname, ms.eventID, e.eventName, e.gender, ms.time, ms.yeargAtEvent
             FROM tblmeetEventHasSwimmer ms
             INNER JOIN tblevent e ON e.eventID = ms.eventID
             INNER JOIN tbluser u ON u.userID = ms.userID
@@ -189,13 +237,10 @@ if ($meetID && $_SERVER['REQUEST_METHOD'] === 'POST') {
             // individual time handler
             $eventID = isset($_POST['eventID']) ? (int)$_POST['eventID'] : 0;
             $userID  = isset($_POST['userID']) ? (int)$_POST['userID'] : 0;
-            $time    = isset($_POST['time']) ? trim($_POST['time']) : '';
+            $timeRaw = isset($_POST['time']) ? trim($_POST['time']) : '';
 
-            if ($eventID <= 0 || $userID <= 0 || $time === '') {
+            if ($eventID <= 0 || $userID <= 0 || $timeRaw === '') {
                 throw new Exception("All fields are required for adding/updating a time.");
-            }
-            if (strlen($time) > 8) {
-                throw new Exception("Time must be at most 8 characters (e.g., 59.59.9).");
             }
 
             $chk = $conn->prepare("SELECT 1 FROM tblmeetHasEvent WHERE meetID = :m AND eventID = :e");
@@ -211,17 +256,80 @@ if ($meetID && $_SERVER['REQUEST_METHOD'] === 'POST') {
             $etype = $tstmt->fetchColumn();
             if ($etype !== 'INDIV') throw new Exception("Use the Relay section to add relay times.");
 
-            $sql = "INSERT INTO tblmeetEventHasSwimmer (userID, meetID, eventID, time)
-                    VALUES (:u, :m, :e, :t)
-                    ON DUPLICATE KEY UPDATE time = VALUES(time)";
-            $stmt = $conn->prepare($sql);
-            $stmt->bindValue(':u', $userID, PDO::PARAM_INT);
-            $stmt->bindValue(':m', $meetID, PDO::PARAM_INT);
-            $stmt->bindValue(':e', $eventID, PDO::PARAM_INT);
-            $stmt->bindValue(':t', $time);
-            $stmt->execute();
+            // Normalize time to canonical MM:SS.hh
+            $cs = parseTimeToCentiseconds($timeRaw);
+            if ($cs === null) {
+                throw new Exception("Invalid time format. Use a format like: SS.hh, M:SS.hh, MM:SS.");
+            }
+            $timeCanonical = formatCentiseconds($cs);
 
-            $messages[] = ($action === 'add_time') ? "Time added." : "Time updated.";
+            if ($action === 'add_time') {
+                // yeargAtEvent: optional input; if blank, snapshot swimmer's current yearg
+                $postedYear = isset($_POST['yeargAtEvent']) ? trim($_POST['yeargAtEvent']) : '';
+                if ($postedYear === '') {
+                    $ystmt = $conn->prepare("SELECT yearg FROM tbluser WHERE userID = :u LIMIT 1");
+                    $ystmt->bindValue(':u', $userID, PDO::PARAM_INT);
+                    $ystmt->execute();
+                    $snap = $ystmt->fetchColumn();
+                    if ($snap === false || (int)$snap < 7 || (int)$snap > 13) {
+                        throw new Exception("Could not snapshot swimmer's year group.");
+                    }
+                    $yeargAtEvent = (int)$snap;
+                } else {
+                    $yeargAtEvent = (int)$postedYear;
+                    if ($yeargAtEvent < 7 || $yeargAtEvent > 13) {
+                        throw new Exception("Year-at-event must be between 7 and 13.");
+                    }
+                }
+
+                // store yeargAtEvent on insert
+                $sql = "INSERT INTO tblmeetEventHasSwimmer (userID, meetID, eventID, time, yeargAtEvent)
+                        VALUES (:u, :m, :e, :t, :yg)
+                        ON DUPLICATE KEY UPDATE time = VALUES(time)";
+                $stmt = $conn->prepare($sql);
+                $stmt->bindValue(':u', $userID, PDO::PARAM_INT);
+                $stmt->bindValue(':m', $meetID, PDO::PARAM_INT);
+                $stmt->bindValue(':e', $eventID, PDO::PARAM_INT);
+                $stmt->bindValue(':t', $timeCanonical);
+                $stmt->bindValue(':yg', $yeargAtEvent, PDO::PARAM_INT);
+                $stmt->execute();
+
+                $messages[] = "Time added.";
+            } else {
+                // update_time: time always updates; yeargAtEvent may change (confirmation handled by JS)
+                $updateYear = false;
+                $newYear = null;
+                if (isset($_POST['yeargAtEvent']) && $_POST['yeargAtEvent'] !== '') {
+                    $newYear = (int)$_POST['yeargAtEvent'];
+                    if ($newYear < 7 || $newYear > 13) {
+                        throw new Exception("Year-at-event must be between 7 and 13.");
+                    }
+                    // compare with current value
+                    $cstmt = $conn->prepare("SELECT yeargAtEvent FROM tblmeetEventHasSwimmer WHERE userID = :u AND meetID = :m AND eventID = :e");
+                    $cstmt->bindValue(':u', $userID, PDO::PARAM_INT);
+                    $cstmt->bindValue(':m', $meetID, PDO::PARAM_INT);
+                    $cstmt->bindValue(':e', $eventID, PDO::PARAM_INT);
+                    $cstmt->execute();
+                    $currentYear = (int)$cstmt->fetchColumn();
+                    if ($currentYear !== $newYear) {
+                        $updateYear = true;
+                    }
+                }
+
+                // update time (always), optionally update yeargAtEvent
+                $usql = "UPDATE tblmeetEventHasSwimmer
+                         SET time = :t" . ($updateYear ? ", yeargAtEvent = :yg" : "") . "
+                         WHERE userID = :u AND meetID = :m AND eventID = :e";
+                $ustmt = $conn->prepare($usql);
+                $ustmt->bindValue(':t', $timeCanonical);
+                if ($updateYear) $ustmt->bindValue(':yg', $newYear, PDO::PARAM_INT);
+                $ustmt->bindValue(':u', $userID, PDO::PARAM_INT);
+                $ustmt->bindValue(':m', $meetID, PDO::PARAM_INT);
+                $ustmt->bindValue(':e', $eventID, PDO::PARAM_INT);
+                $ustmt->execute();
+
+                $messages[] = "Time updated.";
+            }
         }
 
         if ($action === 'delete_time') {
@@ -244,9 +352,9 @@ if ($meetID && $_SERVER['REQUEST_METHOD'] === 'POST') {
             $eventID = isset($_POST['relay_eventID']) ? (int)$_POST['relay_eventID'] : 0;
             // read team name directly
             $teamName = isset($_POST['teamName']) ? trim($_POST['teamName']) : '';
-            $totalTime = isset($_POST['totalTime']) ? trim($_POST['totalTime']) : '';
+            $totalTimeRaw = isset($_POST['totalTime']) ? trim($_POST['totalTime']) : '';
 
-            if ($eventID <= 0 || $teamName === '' || $totalTime === '') {
+            if ($eventID <= 0 || $teamName === '' || $totalTimeRaw === '') {
                 throw new Exception("Relay event, team name, and total time are required.");
             }
 
@@ -258,6 +366,13 @@ if ($meetID && $_SERVER['REQUEST_METHOD'] === 'POST') {
             $etype = $chk->fetchColumn();
             if ($etype !== 'RELAY') throw new Exception("Selected event is not a relay.");
 
+            // Normalize relay total time to canonical MM:SS.hh
+            $relayCs = parseTimeToCentiseconds($totalTimeRaw);
+            if ($relayCs === null) {
+                throw new Exception("Invalid relay total time. Use a format like: SS.hh, M:SS.hh, MM:SS.");
+            }
+            $totalTimeCanonical = formatCentiseconds($relayCs);
+
             // Create or update team (PK is meetID+eventID)
             $ins = $conn->prepare("INSERT INTO tblrelayTeam (meetID, eventID, teamName, totalTime) 
                                    VALUES (:m,:e,:n,:t)
@@ -265,7 +380,7 @@ if ($meetID && $_SERVER['REQUEST_METHOD'] === 'POST') {
             $ins->bindValue(':m', $meetID, PDO::PARAM_INT);
             $ins->bindValue(':e', $eventID, PDO::PARAM_INT);
             $ins->bindValue(':n', $teamName);
-            $ins->bindValue(':t', $totalTime);
+            $ins->bindValue(':t', $totalTimeCanonical);
             $ins->execute();
 
             $messages[] = "Relay team saved. Add members below.";
@@ -325,12 +440,13 @@ $times = $meetID ? getTimes($conn, $meetID) : [];
 // Relay teams for this meet
 $relayTeams = $meetID ? getRelayTeams($conn, $meetID) : [];
 
-// Build swimmer options for JS (id, label, gender)
+// Build swimmer options for JS (id, label, gender, yearg)
 $swimmerOptions = array_map(function($sw) {
     return [
         'id' => (int)$sw['userID'],
         'label' => $sw['surname'] . ', ' . $sw['forename'] . ' [' . $sw['userName'] . ']',
-        'gender' => $sw['gender']
+        'gender' => $sw['gender'],
+        'yearg' => (int)$sw['yearg']
     ];
 }, $swimmers);
 
@@ -466,6 +582,9 @@ $swimmerOptions = array_map(function($sw) {
                 <datalist id="swimmerList"></datalist>
                 <input type="hidden" name="userID" id="userIDHidden" value="" />
 
+                <!-- year-at-event input (optional; will auto-fill on swimmer select if blank) -->
+                <input type="number" name="yeargAtEvent" id="yeargAtEventInput" class="student-select" placeholder="Year at event (7-13)" min="7" max="13">
+
                 <input type="text" name="time" class="time-input" placeholder="mm:ss.ss" maxlength="8" required>
                 <button type="submit" class="btn">Add</button>
             </form>
@@ -478,23 +597,29 @@ $swimmerOptions = array_map(function($sw) {
                     <tr>
                         <th>Event</th>
                         <th>Swimmer</th>
+                        <th>Year</th>
                         <th>Time</th>
                         <th class="col-actions-right">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                 <?php if (empty($times)): ?>
-                    <tr><td colspan="4">No times recorded yet.</td></tr>
+                    <tr><td colspan="5">No times recorded yet.</td></tr>
                 <?php else: ?>
                     <?php foreach ($times as $row): ?>
                         <tr>
                             <td><?= htmlspecialchars($row['eventName'] . ' (' . $row['gender'] . ')') ?></td>
                             <td><?= htmlspecialchars($row['surname'] . ', ' . $row['forename']) ?></td>
                             <td>
-                                <form method="post" class="inline-form">
+                                <form method="post" class="inline-form js-year-update-form">
                                     <input type="hidden" name="meetID" value="<?= (int)$meet['meetID'] ?>">
                                     <input type="hidden" name="eventID" value="<?= (int)$row['eventID'] ?>">
                                     <input type="hidden" name="userID" value="<?= (int)$row['userID'] ?>">
+                                    <!-- editable yeargAtEvent input + original hidden for JS comparison -->
+                                    <input type="hidden" name="original_yeargAtEvent" value="<?= (int)$row['yeargAtEvent'] ?>">
+                                    <input type="number" name="yeargAtEvent" class="student-select" value="<?= (int)$row['yeargAtEvent'] ?>" min="7" max="13" required>
+                            </td>
+                            <td>
                                     <input type="text" name="time" class="time-input" value="<?= htmlspecialchars($row['time']) ?>" maxlength="8" required>
                             </td>
                             <td class="col-actions-right">
@@ -531,7 +656,6 @@ $swimmerOptions = array_map(function($sw) {
                     <?php endforeach; ?>
                 </select>
 
-                <!-- input now uses teamName -->
                 <input type="text" name="teamName" class="student-select" placeholder="Team Name" required>
                 <input type="text" name="totalTime" class="time-input" placeholder="Total Time mm:ss.ss" maxlength="8" required>
                 <button type="submit" class="btn">Create</button>
@@ -560,34 +684,21 @@ $swimmerOptions = array_map(function($sw) {
                             <td><?= htmlspecialchars($rt['teamName'] ?? '') ?></td>
                             <td><?= htmlspecialchars($rt['totalTime'] ?? '') ?></td>
                             <td>
-                                <?php $members = getRelayMembers($conn, (int)$meet['meetID'], (int)$rt['eventID']); ?>
+                                <?php
+                                // List members for each team
+                                $mem = $conn->prepare("SELECT m.leg, u.forename, u.surname FROM tblrelayTeamMember m INNER JOIN tbluser u ON u.userID = m.userID WHERE m.meetID = :m AND m.eventID = :e ORDER BY m.leg ASC");
+                                $mem->bindValue(':m', (int)$meet['meetID'], PDO::PARAM_INT);
+                                $mem->bindValue(':e', (int)$rt['eventID'], PDO::PARAM_INT);
+                                $mem->execute();
+                                $members = $mem->fetchAll(PDO::FETCH_ASSOC);
+                                ?>
                                 <?php if (empty($members)): ?>
-                                    <em>No members yet.</em>
+                                    <em>No members listed.</em>
                                 <?php else: ?>
                                     <?php foreach ($members as $m): ?>
                                         <div><?= (int)$m['leg'] ?>) <?= htmlspecialchars($m['surname'] . ', ' . $m['forename']) ?></div>
                                     <?php endforeach; ?>
                                 <?php endif; ?>
-
-                                <!-- Add member inline -->
-                                <form method="post" class="inline-form mt-12">
-                                    <input type="hidden" name="action" value="add_member">
-                                    <input type="hidden" name="meetID" value="<?= (int)$meet['meetID'] ?>">
-                                    <input type="hidden" name="relay_eventID" value="<?= (int)$rt['eventID'] ?>">
-
-                                    <select name="member_userID" class="student-select" required>
-                                        <option value="">Select swimmer</option>
-                                        <?php foreach ($swimmers as $sw): ?>
-                                            <option value="<?= (int)$sw['userID'] ?>">
-                                                <?= htmlspecialchars($sw['surname'] . ', ' . $sw['forename'] . ' [' . $sw['userName'] . ']') ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-
-                                    <input type="number" name="member_leg" class="student-select" placeholder="Leg (1-4)" min="1" max="4" required>
-                                    <!-- split input removed to match schema without splitTime -->
-                                    <button type="submit" class="btn">Add Member</button>
-                                </form>
                             </td>
                             <td class="col-actions-right">
                                 <form method="post" class="inline-form">
@@ -615,7 +726,9 @@ const swimmerSearch = document.getElementById('swimmerSearch');
 const swimmerList = document.getElementById('swimmerList');
 const userIDHidden = document.getElementById('userIDHidden');
 const addTimeForm = document.getElementById('addTimeForm');
+const yeargAtEventInput = document.getElementById('yeargAtEventInput');
 
+// Auto-build swimmer datalist, with yearg for auto-fill
 function rebuildSwimmerDatalist(requiredGender) {
     while (swimmerList.firstChild) swimmerList.removeChild(swimmerList.firstChild);
     const allowAll = !requiredGender || requiredGender === 'MIX';
@@ -624,11 +737,13 @@ function rebuildSwimmerDatalist(requiredGender) {
             const opt = document.createElement('option');
             opt.value = sw.label;
             opt.dataset.userid = String(sw.id);
+            opt.dataset.yearg = String(sw.yearg);
             swimmerList.appendChild(opt);
         }
     });
     swimmerSearch.value = '';
     userIDHidden.value = '';
+    if (yeargAtEventInput) yeargAtEventInput.value = '';
 }
 
 function handleEventChange() {
@@ -637,30 +752,64 @@ function handleEventChange() {
     rebuildSwimmerDatalist(evtGender);
 }
 
+// Resolve selected swimmer, set hidden userID, and auto-fill yeargAtEvent if blank
 function handleSwimmerChosen() {
     const label = swimmerSearch.value;
     let chosenId = '';
+    let chosenYear = '';
     const opts = swimmerList.querySelectorAll('option');
     for (const opt of opts) {
         if (opt.value === label) {
             chosenId = opt.dataset.userid || '';
+            chosenYear = opt.dataset.yearg || '';
             break;
         }
     }
     if (!chosenId) {
         const match = SWIMMERS.find(sw => sw.label === label);
-        if (match) chosenId = String(match.id);
+        if (match) {
+            chosenId = String(match.id);
+            chosenYear = String(match.yearg);
+        }
     }
     userIDHidden.value = chosenId || '';
+    // Auto-fill year-at-event if empty
+    if (yeargAtEventInput && (!yeargAtEventInput.value || yeargAtEventInput.value.trim() === '') && chosenYear) {
+        yeargAtEventInput.value = chosenYear;
+    }
 }
 
+// Prevent add if swimmer not selected and validate year range
 function handleAddFormSubmit(e) {
     if (!userIDHidden.value) {
         e.preventDefault();
         alert('Please select a swimmer from the list (type and choose a suggestion).');
         swimmerSearch.focus();
+        return;
+    }
+    if (yeargAtEventInput && yeargAtEventInput.value) {
+        const yg = parseInt(yeargAtEventInput.value, 10);
+        if (isNaN(yg) || yg < 7 || yg > 13) {
+            e.preventDefault();
+            alert('Year-at-event must be between 7 and 13.');
+            yeargAtEventInput.focus();
+        }
     }
 }
+
+// Confirm popup on updating year-at-event in Existing Times
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('form.js-year-update-form').forEach(function(form) {
+        form.addEventListener('submit', function(e) {
+            const original = form.querySelector('input[name="original_yeargAtEvent"]')?.value || '';
+            const current = form.querySelector('input[name="yeargAtEvent"]')?.value || '';
+            if (original && current && original !== current) {
+                const ok = confirm('You are changing the year group at this event for this result. Click OK to confirm.');
+                if (!ok) e.preventDefault();
+            }
+        });
+    });
+});
 
 if (eventSelect) {
     eventSelect.addEventListener('change', handleEventChange);

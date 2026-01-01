@@ -70,7 +70,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <button type="submit">Login</button>
         </form>
 
-        <a class="link-secondary" href="contact.php">Forgot password?</a>
+        <a class="link-secondary" href="tool.php">Forgot password?</a>
         <div class="extra-section">
             A Swim Team member and don't have an account?
             <br>
