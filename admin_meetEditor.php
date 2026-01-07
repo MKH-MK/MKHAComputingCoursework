@@ -731,9 +731,16 @@ const yeargAtEventInput = document.getElementById('yeargAtEventInput');
 // Auto-build swimmer datalist, with yearg for auto-fill
 function rebuildSwimmerDatalist(requiredGender) {
     while (swimmerList.firstChild) swimmerList.removeChild(swimmerList.firstChild);
-    const allowAll = !requiredGender || requiredGender === 'MIX';
+    // For individual events:
+    // - Male event: include swimmers with gender 'M' and 'MIX'
+    // - Female event: include only 'F'
+    // - If no gender provided, allow all
     SWIMMERS.forEach(sw => {
-        if (allowAll || sw.gender === requiredGender) {
+        const isEligible =
+            !requiredGender ||
+            (requiredGender === 'M' && (sw.gender === 'M' || sw.gender === 'MIX')) ||
+            (requiredGender === 'F' && sw.gender === 'F');
+        if (isEligible) {
             const opt = document.createElement('option');
             opt.value = sw.label;
             opt.dataset.userid = String(sw.id);

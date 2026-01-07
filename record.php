@@ -4,123 +4,232 @@ include_once('connection.php');
 include_once('auth.php');
 enforceSessionPolicies($conn);
 
+if (!isset($_SESSION['role']) || (int)$_SESSION['role'] < 1) {
+    echo '<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Oundle School Swim Team - Denied Access</title>
+    <meta name="viewport" content="width=1024, initial-scale=1">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="main-content">
+        <div class="page-title">Access Denied</div>
+        <div class="section">
+            <div class="alert-fail">Permision Error: You are not logged in or do not have the right privilage to access this page</div>
+            <h2>Further options:</h2>
+            <ul>
+                <li>If you think this is an error, please <a href="contact.php">contact the administrator</a>.
+                <li><a href="login.php">Login</a></li>
+                <li><a href="index.php">Return to Home</a></li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>';
+    exit();
+}
 
-/* CHANGES FOR RELAY: records page supports INDIV and RELAY by selecting event from tblevent (with eventType set).
-   Follow existing patterns: toolbars, filters, pagination like admin_meetList.php.
-*/
-
-// Params and defaults
-$perPage = isset($_GET['per_page']) && in_array((int)$_GET['per_page'], [20,35,50], true) ? (int)$_GET['per_page'] : 20;
-$page = isset($_GET['page']) && ctype_digit((string)$_GET['page']) && (int)$_GET['page'] > 0 ? (int)$_GET['page'] : 1;
-
-$course = isset($_GET['course']) && in_array($_GET['course'], ['L','S'], true) ? $_GET['course'] : '';
-$yearg = isset($_GET['yearg']) && ctype_digit((string)$_GET['yearg']) ? (int)$_GET['yearg'] : 0;
-$eventID = isset($_GET['eventID']) && ctype_digit((string)$_GET['eventID']) ? (int)$_GET['eventID'] : 0;
-
-// Build event options (user chooses first)
-$events = [];
-try {
-    $stmt = $conn->prepare("SELECT eventID, eventName, course, gender, eventType FROM tblevent ORDER BY eventID ASC");
-    $stmt->execute();
-    $events = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {}
-
+/* Helpers */
 function currentUrl(array $overrides = []): string {
     $q = array_merge($_GET, $overrides);
     return '?' . http_build_query($q);
 }
+function selected($cond) { return $cond ? 'selected' : ''; }
 
-// Build WHERE based on selections
-$whereParts = [];
-$params = [];
+function courseLabel(string $c): string { return $c === 'L' ? 'Longcourse' : 'Shortcourse'; }
 
-if ($eventID) {
-    // detect type
-    $etypeStmt = $conn->prepare("SELECT eventType, course FROM tblevent WHERE eventID = :e LIMIT 1");
-    $etypeStmt->bindValue(':e', $eventID, PDO::PARAM_INT);
-    $etypeStmt->execute();
-    $etypeRow = $etypeStmt->fetch(PDO::FETCH_ASSOC);
-    $selectedType = $etypeRow['eventType'] ?? 'INDIV';
-    $selectedCourse = $etypeRow['course'] ?? null;
-
-    // validate course filter: if user chose a course, it must match event's course
-    if ($course && $selectedCourse && $course !== $selectedCourse) {
-        // mismatch -> no results
-        $whereParts[] = '1=0';
-    }
-
-    if ($selectedType === 'INDIV') {
-        // Query individual results
-        $countSql = "SELECT COUNT(*) 
-                     FROM tblmeetEventHasSwimmer s
-                     INNER JOIN tbluser u ON u.userID = s.userID
-                     WHERE s.eventID = :e" . ($yearg ? " AND u.yearg = :y" : "");
-        $listSql = "SELECT u.forename, u.surname, u.yearg, s.time, s.userID
-                    FROM tblmeetEventHasSwimmer s
-                    INNER JOIN tbluser u ON u.userID = s.userID
-                    WHERE s.eventID = :e" . ($yearg ? " AND u.yearg = :y" : "") . "
-                    ORDER BY s.time ASC"; // simple fastest-first sort
-
-        $countStmt = $conn->prepare($countSql);
-        $countStmt->bindValue(':e', $eventID, PDO::PARAM_INT);
-        if ($yearg) $countStmt->bindValue(':y', $yearg, PDO::PARAM_INT);
-        $countStmt->execute();
-        $totalRows = (int)$countStmt->fetchColumn();
-
-        $totalPages = max(1, (int)ceil($totalRows / $perPage));
-        $page = min($page, $totalPages);
-        $offset = ($page - 1) * $perPage;
-
-        $listStmt = $conn->prepare($listSql . " LIMIT :limit OFFSET :offset");
-        $listStmt->bindValue(':e', $eventID, PDO::PARAM_INT);
-        if ($yearg) $listStmt->bindValue(':y', $yearg, PDO::PARAM_INT);
-        $listStmt->bindValue(':limit', $perPage, PDO::PARAM_INT);
-        $listStmt->bindValue(':offset', $offset, PDO::PARAM_INT);
-        $listStmt->execute();
-        $rows = $listStmt->fetchAll(PDO::FETCH_ASSOC);
-
+// School year: start 31 Aug (inclusive) to 30 Aug next year (inclusive)
+function computeSchoolYearRange(DateTime $today, DateTimeZone $tz): array {
+    $year = (int)$today->format('Y');
+    $startThisYear = new DateTime("$year-08-31", $tz);
+    if ($today >= $startThisYear) {
+        $start = $startThisYear;
+        $end = (clone $start)->modify('+1 year')->modify('-1 day'); // 30 Aug next year
     } else {
-        // RELAY results: list teams and their total times, filter by year group if any member matches (simple: any leg in yearg)
-        $countSql = "SELECT COUNT(DISTINCT rt.relayTeamID)
-                     FROM tblrelayTeam rt
-                     INNER JOIN tblrelayTeamMember m ON m.relayTeamID = rt.relayTeamID
-                     INNER JOIN tbluser u ON u.userID = m.userID
-                     WHERE rt.eventID = :e" . ($yearg ? " AND u.yearg = :y" : "");
-        $listSql = "SELECT rt.relayTeamID, rt.teamCode, rt.totalTime,
-                           GROUP_CONCAT(CONCAT(u.forename,' ',u.surname,' (Y',u.yearg,', leg ',m.leg,')') ORDER BY m.leg SEPARATOR '; ') AS members
-                    FROM tblrelayTeam rt
-                    INNER JOIN tblrelayTeamMember m ON m.relayTeamID = rt.relayTeamID
-                    INNER JOIN tbluser u ON u.userID = m.userID
-                    WHERE rt.eventID = :e" . ($yearg ? " AND u.yearg = :y" : "") . "
-                    GROUP BY rt.relayTeamID
-                    ORDER BY rt.totalTime ASC, rt.teamCode ASC";
-
-        $countStmt = $conn->prepare($countSql);
-        $countStmt->bindValue(':e', $eventID, PDO::PARAM_INT);
-        if ($yearg) $countStmt->bindValue(':y', $yearg, PDO::PARAM_INT);
-        $countStmt->execute();
-        $totalRows = (int)$countStmt->fetchColumn();
-
-        $totalPages = max(1, (int)ceil($totalRows / $perPage));
-        $page = min($page, $totalPages);
-        $offset = ($page - 1) * $perPage;
-
-        $listStmt = $conn->prepare($listSql . " LIMIT :limit OFFSET :offset");
-        $listStmt->bindValue(':e', $eventID, PDO::PARAM_INT);
-        if ($yearg) $listStmt->bindValue(':y', $yearg, PDO::PARAM_INT);
-        $listStmt->bindValue(':limit', $perPage, PDO::PARAM_INT);
-        $listStmt->bindValue(':offset', $offset, PDO::PARAM_INT);
-        $listStmt->execute();
-        $rows = $listStmt->fetchAll(PDO::FETCH_ASSOC);
+        $start = (new DateTime(($year - 1) . "-08-31", $tz));
+        $end = (new DateTime("$year-08-30", $tz));
     }
-} else {
-    $rows = [];
-    $totalRows = 0;
-    $totalPages = 1;
-    $page = 1;
-    $offset = 0;
+    return [$start->format('Y-m-d'), $end->format('Y-m-d')];
 }
 
+/* Stroke options ordered by PK (eventID) */
+function getStrokesByPK(PDO $conn, string $course, string $etype): array {
+    $sql = "SELECT eventName, MIN(eventID) AS firstID
+            FROM tblevent
+            WHERE course = :c AND eventType = :t
+            GROUP BY eventName
+            ORDER BY firstID ASC";
+    $stmt = $conn->prepare($sql);
+    $stmt->bindValue(':c', $course);
+    $stmt->bindValue(':t', $etype);
+    $stmt->execute();
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/* Individual filters (GET) */
+$indCourse = (isset($_GET['ind_course']) && in_array($_GET['ind_course'], ['L','S'], true)) ? $_GET['ind_course'] : 'L';
+$indStroke = isset($_GET['ind_stroke']) ? trim($_GET['ind_stroke']) : '';
+$indGender = (isset($_GET['ind_gender']) && in_array($_GET['ind_gender'], ['M','F'], true)) ? $_GET['ind_gender'] : 'M';
+$indPeriod = (isset($_GET['ind_period']) && in_array($_GET['ind_period'], ['all','school'], true)) ? $_GET['ind_period'] : 'all';
+$indYearg = (isset($_GET['ind_yearg']) && $_GET['ind_yearg'] !== '' && ctype_digit((string)$_GET['ind_yearg'])) ? (int)$_GET['ind_yearg'] : null;
+$indPerPage = (isset($_GET['ind_per_page']) && in_array((int)$_GET['ind_per_page'], [20,35,50], true)) ? (int)$_GET['ind_per_page'] : 20;
+$indPage = (isset($_GET['ind_page']) && ctype_digit((string)$_GET['ind_page']) && (int)$_GET['ind_page'] > 0) ? (int)$_GET['ind_page'] : 1;
+
+/* Relay filters (GET) */
+$rlCourse = (isset($_GET['rl_course']) && in_array($_GET['rl_course'], ['L','S'], true)) ? $_GET['rl_course'] : 'L';
+$rlStroke = isset($_GET['rl_stroke']) ? trim($_GET['rl_stroke']) : '';
+$rlGender = (isset($_GET['rl_gender']) && in_array($_GET['rl_gender'], ['M','F','MIX'], true)) ? $_GET['rl_gender'] : 'M';
+$rlPeriod = (isset($_GET['rl_period']) && in_array($_GET['rl_period'], ['all','school'], true)) ? $_GET['rl_period'] : 'all';
+$rlPerPage = (isset($_GET['rl_per_page']) && in_array((int)$_GET['rl_per_page'], [20,35,50], true)) ? (int)$_GET['rl_per_page'] : 20;
+$rlPage = (isset($_GET['rl_page']) && ctype_digit((string)$_GET['rl_page']) && (int)$_GET['rl_page'] > 0) ? (int)$_GET['rl_page'] : 1;
+
+/* Stroke options (ordered by PK) */
+$indStrokeOpts = getStrokesByPK($conn, $indCourse, 'INDIV'); // array of ['eventName','firstID']
+$rlStrokeOpts  = getStrokesByPK($conn, $rlCourse, 'RELAY');
+
+/* Flatten names for validation */
+$indStrokes = array_map(fn($r) => $r['eventName'], $indStrokeOpts);
+$rlStrokes  = array_map(fn($r) => $r['eventName'], $rlStrokeOpts);
+
+/* Date range for school year */
+$tz = new DateTimeZone('Europe/London');
+[$schoolStart, $schoolEnd] = computeSchoolYearRange(new DateTime('now', $tz), $tz);
+
+/* Individual results */
+$indResults = [];
+$indTotalRows = 0;
+
+if ($indStroke !== '' && in_array($indStroke, $indStrokes, true)) {
+    // Count
+    $countSql = "SELECT COUNT(*) 
+                 FROM tblmeetEventHasSwimmer ms
+                 INNER JOIN tblevent e ON e.eventID = ms.eventID
+                 INNER INNER JOIN tbluser u ON u.userID = ms.userID
+                 INNER JOIN tblmeet m ON m.meetID = ms.meetID
+                 WHERE e.eventType = 'INDIV' 
+                   AND e.course = :c 
+                   AND e.eventName = :stroke
+                   AND e.gender = :evgender
+                   AND " . ($indGender === 'M' ? "u.gender IN ('M','MIX')" : "u.gender = 'F'") . "
+                   " . ($indPeriod === 'school' ? "AND m.meetDate BETWEEN :ds AND :de" : "") . "
+                   " . ($indYearg !== null ? "AND ms.yeargAtEvent = :yg" : "");
+    $countSql = str_replace('INNER INNER JOIN', 'INNER JOIN', $countSql);
+    $stCount = $conn->prepare($countSql);
+    $stCount->bindValue(':c', $indCourse);
+    $stCount->bindValue(':stroke', $indStroke);
+    $stCount->bindValue(':evgender', $indGender);
+    if ($indPeriod === 'school') {
+        $stCount->bindValue(':ds', $schoolStart);
+        $stCount->bindValue(':de', $schoolEnd);
+    }
+    if ($indYearg !== null) $stCount->bindValue(':yg', $indYearg, PDO::PARAM_INT);
+    $stCount->execute();
+    $indTotalRows = (int)$stCount->fetchColumn();
+
+    $indTotalPages = max(1, (int)ceil($indTotalRows / $indPerPage));
+    $indPage = min($indPage, $indTotalPages);
+    $indOffset = ($indPage - 1) * $indPerPage;
+
+    // List
+    $listSql = "SELECT 
+                    u.userID, u.forename, u.surname, ms.yeargAtEvent, ms.time, 
+                    m.meetDate, m.meetName, m.meetID
+                FROM tblmeetEventHasSwimmer ms
+                INNER JOIN tblevent e ON e.eventID = ms.eventID
+                INNER JOIN tbluser u ON u.userID = ms.userID
+                INNER JOIN tblmeet m ON m.meetID = ms.meetID
+                WHERE e.eventType = 'INDIV' 
+                  AND e.course = :c 
+                  AND e.eventName = :stroke
+                  AND e.gender = :evgender
+                  AND " . ($indGender === 'M' ? "u.gender IN ('M','MIX')" : "u.gender = 'F'") . "
+                  " . ($indPeriod === 'school' ? "AND m.meetDate BETWEEN :ds AND :de" : "") . "
+                  " . ($indYearg !== null ? "AND ms.yeargAtEvent = :yg" : "") . "
+                ORDER BY 
+                  (CAST(SUBSTRING(ms.time, 1, 2) AS UNSIGNED) * 6000 +
+                   CAST(SUBSTRING(ms.time, 4, 2) AS UNSIGNED) * 100 +
+                   CAST(SUBSTRING(ms.time, 7, 2) AS UNSIGNED)) ASC,
+                  m.meetDate ASC
+                LIMIT :limit OFFSET :offset";
+    $stList = $conn->prepare($listSql);
+    $stList->bindValue(':c', $indCourse);
+    $stList->bindValue(':stroke', $indStroke);
+    $stList->bindValue(':evgender', $indGender);
+    if ($indPeriod === 'school') {
+        $stList->bindValue(':ds', $schoolStart);
+        $stList->bindValue(':de', $schoolEnd);
+    }
+    if ($indYearg !== null) $stList->bindValue(':yg', $indYearg, PDO::PARAM_INT);
+    $stList->bindValue(':limit', $indPerPage, PDO::PARAM_INT);
+    $stList->bindValue(':offset', $indOffset, PDO::PARAM_INT);
+    $stList->execute();
+    $indResults = $stList->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/* Relay results */
+$rlResults = [];
+$rlTotalRows = 0;
+if ($rlStroke !== '' && in_array($rlStroke, $rlStrokes, true)) {
+    $countSql = "SELECT COUNT(*) 
+                 FROM tblrelayTeam rt
+                 INNER JOIN tblevent e ON e.eventID = rt.eventID
+                 INNERJOIN tblmeet m ON m.meetID = rt.meetID
+                 WHERE e.eventType = 'RELAY'
+                   AND e.course = :c
+                   AND e.eventName = :stroke
+                   AND e.gender = :evgender
+                   " . ($rlPeriod === 'school' ? "AND m.meetDate BETWEEN :ds AND :de" : "");
+    $countSql = str_replace('INNERJOIN', 'INNER JOIN', $countSql);
+    $stCount = $conn->prepare($countSql);
+    $stCount->bindValue(':c', $rlCourse);
+    $stCount->bindValue(':stroke', $rlStroke);
+    $stCount->bindValue(':evgender', $rlGender);
+    if ($rlPeriod === 'school') {
+        $stCount->bindValue(':ds', $schoolStart);
+        $stCount->bindValue(':de', $schoolEnd);
+    }
+    $stCount->execute();
+    $rlTotalRows = (int)$stCount->fetchColumn();
+
+    $rlTotalPages = max(1, (int)ceil($rlTotalRows / $rlPerPage));
+    $rlPage = min($rlPage, $rlTotalPages);
+    $rlOffset = ($rlPage - 1) * $rlPerPage;
+
+    $listSql = "SELECT 
+                    rt.teamName, rt.totalTime, m.meetDate, m.meetName, m.meetID
+                FROM tblrelayTeam rt
+                INNER JOIN tblevent e ON e.eventID = rt.eventID
+                INNER JOIN tblmeet m ON m.meetID = rt.meetID
+                WHERE e.eventType = 'RELAY'
+                  AND e.course = :c
+                  AND e.eventName = :stroke
+                  AND e.gender = :evgender
+                  " . ($rlPeriod === 'school' ? "AND m.meetDate BETWEEN :ds AND :de" : "") . "
+                ORDER BY 
+                  (CAST(SUBSTRING(rt.totalTime, 1, 2) AS UNSIGNED) * 6000 +
+                   CAST(SUBSTRING(rt.totalTime, 4, 2) AS UNSIGNED) * 100 +
+                   CAST(SUBSTRING(rt.totalTime, 7, 2) AS UNSIGNED)) ASC,
+                  m.meetDate ASC
+                LIMIT :limit OFFSET :offset";
+    $stList = $conn->prepare($listSql);
+    $stList->bindValue(':c', $rlCourse);
+    $stList->bindValue(':stroke', $rlStroke);
+    $stList->bindValue(':evgender', $rlGender);
+    if ($rlPeriod === 'school') {
+        $stList->bindValue(':ds', $schoolStart);
+        $stList->bindValue(':de', $schoolEnd);
+    }
+    $stList->bindValue(':limit', $rlPerPage, PDO::PARAM_INT);
+    $stList->bindValue(':offset', $rlOffset, PDO::PARAM_INT);
+    $stList->execute();
+    $rlResults = $stList->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/* Titles */
+$indTitle = ($indStroke !== '' ? ($indStroke . ' – ' . courseLabel($indCourse)) : 'Select filters and Search');
+$rlTitle  = ($rlStroke !== '' ? ($rlStroke . ' – ' . courseLabel($rlCourse)) : 'Select filters and Search');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -136,107 +245,221 @@ if ($eventID) {
 <div class="main-content">
     <div class="page-title">Records</div>
 
+    <!-- INDIVIDUAL RECORDS -->
     <div class="section">
-        <h2>Find Records</h2>
+        <h2>Individual Records</h2>
+        <form method="get" class="form-section form-section--wide">
+            <div class="form-row">
+                <label class="check-item">Course</label>
+                <select name="ind_course" class="input">
+                    <option value="L" <?= selected($indCourse==='L') ?>>Long</option>
+                    <option value="S" <?= selected($indCourse==='S') ?>>Short</option>
+                </select>
+            </div>
 
-        <form method="get" class="toolbar">
-            <div class="toolbar-left search-bar">
-                <!-- Event select -->
-                <select name="eventID" class="search-order" required>
-                    <option value="">Select Event</option>
-                    <?php foreach ($events as $ev): ?>
-                        <option value="<?= (int)$ev['eventID'] ?>" <?= $eventID===(int)$ev['eventID']?'selected':'' ?>>
-                            <?= htmlspecialchars($ev['eventName'] . ' (' . $ev['gender'] . ') ' . ($ev['eventType']==='RELAY'?'[Relay]':'')) ?>
+            <div class="form-row">
+                <label class="check-item">Stroke</label>
+                <select name="ind_stroke" class="input">
+                    <option value="">Please Choose</option>
+                    <?php foreach ($indStrokeOpts as $opt): ?>
+                        <option value="<?= htmlspecialchars($opt['eventName']) ?>" <?= selected($indStroke===$opt['eventName']) ?>>
+                            <?= htmlspecialchars($opt['eventName']) ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
-
-                <!-- Course display (informational only; event has fixed course) -->
-                <select name="course" class="search-order">
-                    <option value="">Course (auto)</option>
-                    <option value="L" <?= $course==='L'?'selected':'' ?>>Longcourse</option>
-                    <option value="S" <?= $course==='S'?'selected':'' ?>>Shortcourse</option>
-                </select>
-
-                <!-- Year group filter -->
-                <input type="number" name="yearg" class="search-order" min="7" max="13" value="<?= $yearg ?: '' ?>" placeholder="Year Group (optional)">
             </div>
 
-            <div class="toolbar-right filters-group">
-                <select name="per_page" class="search-order">
-                    <option value="20" <?= $perPage===20?'selected':'' ?>>20</option>
-                    <option value="35" <?= $perPage===35?'selected':'' ?>>35</option>
-                    <option value="50" <?= $perPage===50?'selected':'' ?>>50</option>
+            <div class="form-row">
+                <label class="check-item">Gender</label>
+                <select name="ind_gender" class="input">
+                    <option value="M" <?= selected($indGender==='M') ?>>Male (Open)</option>
+                    <option value="F" <?= selected($indGender==='F') ?>>Female</option>
                 </select>
-                <button type="submit" class="btn">Apply</button>
-                <a href="records.php" class="btn btn-reset">Reset</a>
+            </div>
+
+            <div class="form-row">
+                <label class="check-item">Period</label>
+                <select name="ind_period" class="input">
+                    <option value="all" <?= selected($indPeriod==='all') ?>>All Time</option>
+                    <option value="school" <?= selected($indPeriod==='school') ?>>School Year</option>
+                </select>
+            </div>
+
+            <div class="form-row">
+                <label class="check-item">Year Group</label>
+                <select name="ind_yearg" class="input">
+                    <option value="" <?= selected($indYearg===null) ?>>Open (7–13)</option>
+                    <?php for ($yg=7; $yg<=13; $yg++): ?>
+                        <option value="<?= $yg ?>" <?= selected($indYearg===$yg) ?>><?= $yg ?></option>
+                    <?php endfor; ?>
+                </select>
+            </div>
+
+            <!-- Always start on page 1 for each search -->
+            <input type="hidden" name="ind_page" value="1">
+
+            <div class="form-row form-row--center">
+                <button type="submit" class="btn">Search</button>
+                <a href="record.php" class="btn btn-reset">Reset</a>
             </div>
         </form>
 
         <div class="table-wrap">
+            <h3 class="event-subtitle"><?= htmlspecialchars($indTitle) ?></h3>
             <table class="meets">
                 <thead>
-                    <?php
-                    // Headings depend on event type if selected
-                    $headRelay = ['Team', 'Total Time', 'Members'];
-                    $headIndiv = ['Surname', 'Forename', 'Year', 'Time'];
-                    ?>
                     <tr>
-                        <?php if ($eventID && isset($etypeRow) && ($etypeRow['eventType'] ?? 'INDIV') === 'RELAY'): ?>
-                            <th><?= htmlspecialchars('Team') ?></th>
-                            <th><?= htmlspecialchars('Total Time') ?></th>
-                            <th><?= htmlspecialchars('Members') ?></th>
-                        <?php else: ?>
-                            <th><?= htmlspecialchars('Surname') ?></th>
-                            <th><?= htmlspecialchars('Forename') ?></th>
-                            <th><?= htmlspecialchars('Year') ?></th>
-                            <th><?= htmlspecialchars('Time') ?></th>
-                        <?php endif; ?>
+                        <th>Name</th>
+                        <th>Time</th>
+                        <th>Year Group</th>
+                        <th>Date</th>
+                        <th>Meet</th>
                     </tr>
                 </thead>
                 <tbody>
-                <?php if (empty($rows)): ?>
-                    <tr><td colspan="4">No results to show. Select an event above.</td></tr>
+                <?php if ($indStroke === '' || empty($indResults)): ?>
+                    <tr><td colspan="5">No results for this selection.</td></tr>
                 <?php else: ?>
-                    <?php if ($eventID && isset($etypeRow) && ($etypeRow['eventType'] ?? 'INDIV') === 'RELAY'): ?>
-                        <?php foreach ($rows as $r): ?>
-                            <tr>
-                                <td><?= htmlspecialchars($r['teamCode'] ?? '') ?></td>
-                                <td><?= htmlspecialchars($r['totalTime'] ?? '') ?></td>
-                                <td><?= htmlspecialchars($r['members'] ?? '') ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php else: ?>
-                        <?php foreach ($rows as $r): ?>
-                            <tr>
-                                <td><?= htmlspecialchars($r['surname']) ?></td>
-                                <td><?= htmlspecialchars($r['forename']) ?></td>
-                                <td><?= (int)$r['yearg'] ?></td>
-                                <td><?= htmlspecialchars($r['time']) ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
+                    <?php foreach ($indResults as $row): ?>
+                        <tr>
+                            <td>
+                                <a class="link" href="<?= 'account.php?userID=' . (int)$row['userID'] ?>">
+                                    <?= htmlspecialchars($row['forename'] . ' ' . $row['surname']) ?>
+                                </a>
+                            </td>
+                            <td><?= htmlspecialchars($row['time']) ?></td>
+                            <td><?= (int)$row['yeargAtEvent'] ?></td>
+                            <td><?= htmlspecialchars($row['meetDate']) ?></td>
+                            <td>
+                                <a class="link" href="<?= 'meet.php?meetID=' . (int)$row['meetID'] ?>">
+                                    <?= htmlspecialchars($row['meetName']) ?>
+                                </a>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
                 <?php endif; ?>
                 </tbody>
             </table>
 
-            <?php if (($totalPages ?? 1) > 1): ?>
+            <?php if ($indTotalRows > $indPerPage): ?>
+                <?php
+                    $indTotalPages = max(1, (int)ceil($indTotalRows / $indPerPage));
+                    $prevPage = max(1, $indPage - 1);
+                    $nextPage = min($indTotalPages, $indPage + 1);
+                ?>
                 <div class="pagination">
-                    <?php
-                    $prevPage = max(1, $page - 1);
-                    $nextPage = min($totalPages, $page + 1);
-                    ?>
-                    <a href="<?= currentUrl(['page' => $prevPage]) ?>">&#8592; Prev</a>
-                    <span class="current"><?= $page ?> / <?= $totalPages ?></span>
-                    <a href="<?= currentUrl(['page' => $nextPage]) ?>">Next &#8594;</a>
+                    <a href="<?= currentUrl(['ind_page' => $prevPage]) ?>">&#8592; Prev</a>
+                    <span class="current"><?= $indPage ?> / <?= $indTotalPages ?></span>
+                    <a href="<?= currentUrl(['ind_page' => $nextPage]) ?>">Next &#8594;</a>
                 </div>
             <?php endif; ?>
-
             <div class="per-page">
                 <span class="per-page-label">Entries:</span>
-                <a class="btn <?= $perPage===20?'btn-active':'' ?>" href="<?= currentUrl(['per_page'=>20, 'page'=>1]) ?>">20</a>
-                <a class="btn <?= $perPage===35?'btn-active':'' ?>" href="<?= currentUrl(['per_page'=>35, 'page'=>1]) ?>">35</a>
-                <a class="btn <?= $perPage===50?'btn-active':'' ?>" href="<?= currentUrl(['per_page'=>50, 'page'=>1]) ?>">50</a>
+                <a class="btn <?= $indPerPage===20?'btn-active':'' ?>" href="<?= currentUrl(['ind_per_page'=>20, 'ind_page'=>1]) ?>">20</a>
+                <a class="btn <?= $indPerPage===35?'btn-active':'' ?>" href="<?= currentUrl(['ind_per_page'=>35, 'ind_page'=>1]) ?>">35</a>
+                <a class="btn <?= $indPerPage===50?'btn-active':'' ?>" href="<?= currentUrl(['ind_per_page'=>50, 'ind_page'=>1]) ?>">50</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- RELAY RECORDS -->
+    <div class="section">
+        <h2>Relay Records</h2>
+        <form method="get" class="form-section form-section--wide">
+            <div class="form-row">
+                <label class="check-item">Course</label>
+                <select name="rl_course" class="input">
+                    <option value="L" <?= selected($rlCourse==='L') ?>>Long</option>
+                    <option value="S" <?= selected($rlCourse==='S') ?>>Short</option>
+                </select>
+            </div>
+
+            <div class="form-row">
+                <label class="check-item">Relay Event</label>
+                <select name="rl_stroke" class="input">
+                    <option value="">Please Choose</option>
+                    <?php foreach ($rlStrokeOpts as $opt): ?>
+                        <option value="<?= htmlspecialchars($opt['eventName']) ?>" <?= selected($rlStroke===$opt['eventName']) ?>>
+                            <?= htmlspecialchars($opt['eventName']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="form-row">
+                <label class="check-item">Gender</label>
+                <select name="rl_gender" class="input">
+                    <option value="M" <?= selected($rlGender==='M') ?>>Male</option>
+                    <option value="F" <?= selected($rlGender==='F') ?>>Female</option>
+                    <option value="MIX" <?= selected($rlGender==='MIX') ?>>Mixed</option>
+                </select>
+            </div>
+
+            <div class="form-row">
+                <label class="check-item">Period</label>
+                <select name="rl_period" class="input">
+                    <option value="all" <?= selected($rlPeriod==='all') ?>>All Time</option>
+                    <option value="school" <?= selected($rlPeriod==='school') ?>>School Year</option>
+                </select>
+            </div>
+
+            <!-- Always start on page 1 for each search -->
+            <input type="hidden" name="rl_page" value="1">
+
+            <div class="form-row form-row--center">
+                <button type="submit" class="btn">Search</button>
+                <a href="<?= currentUrl(['rl_stroke'=>'', 'rl_gender'=>'M', 'rl_period'=>'all', 'rl_page'=>1, 'rl_per_page'=>20]) ?>" class="btn btn-reset">Reset</a>
+            </div>
+        </form>
+
+        <div class="table-wrap">
+            <h3 class="event-subtitle"><?= htmlspecialchars($rlTitle) ?></h3>
+            <table class="meets">
+                <thead>
+                    <tr>
+                        <th>Team</th>
+                        <th>Total Time</th>
+                        <th>Date</th>
+                        <th>Meet</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php if ($rlStroke === '' || empty($rlResults)): ?>
+                    <tr><td colspan="4">No results for this selection.</td></tr>
+                <?php else: ?>
+                    <?php foreach ($rlResults as $row): ?>
+                        <tr>
+                            <td><?= htmlspecialchars($row['teamName'] ?? '') ?></td>
+                            <td><?= htmlspecialchars($row['totalTime'] ?? '') ?></td>
+                            <td><?= htmlspecialchars($row['meetDate']) ?></td>
+                            <td>
+                                <a class="link" href="<?= 'meet.php?meetID=' . (int)$row['meetID'] ?>">
+                                    <?= htmlspecialchars($row['meetName']) ?>
+                                </a>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+                </tbody>
+            </table>
+
+            <?php if ($rlTotalRows > $rlPerPage): ?>
+                <?php
+                    $rlTotalPages = max(1, (int)ceil($rlTotalRows / $rlPerPage));
+                    $prevPage = max(1, $rlPage - 1);
+                    $nextPage = min($rlTotalPages, $rlPage + 1);
+                ?>
+                <div class="pagination">
+                    <a href="<?= currentUrl(['rl_page' => $prevPage]) ?>">&#8592; Prev</a>
+                    <span class="current"><?= $rlPage ?> / <?= $rlTotalPages ?></span>
+                    <a href="<?= currentUrl(['rl_page' => $nextPage]) ?>">Next &#8594;</a>
+                </div>
+            <?php endif; ?>
+            <div class="per-page">
+                <span class="per-page-label">Entries:</span>
+                <a class="btn <?= $rlPerPage===20?'btn-active':'' ?>" href="<?= currentUrl(['rl_per_page'=>20, 'rl_page'=>1]) ?>">20</a>
+                <a class="btn <?= $rlPerPage===35?'btn-active':'' ?>" href="<?= currentUrl(['rl_per_page'=>35, 'rl_page'=>1]) ?>">35</a>
+                <a class="btn <?= $rlPerPage===50?'btn-active':'' ?>" href="<?= currentUrl(['rl_per_page'=>50, 'rl_page'=>1]) ?>">50</a>
             </div>
         </div>
     </div>

@@ -4,10 +4,8 @@ include_once('connection.php');
 include_once('auth.php');
 enforceSessionPolicies($conn);
 
-/* Access control: only allow logged-in users with role >= 1 (exclude guests / role 0) */
 if (!isset($_SESSION['role']) || (int)$_SESSION['role'] < 1) {
     echo '<!DOCTYPE html>
-
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -15,33 +13,36 @@ if (!isset($_SESSION['role']) || (int)$_SESSION['role'] < 1) {
     <meta name="viewport" content="width=1024, initial-scale=1">
     <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
     <div class="main-content">
-        <div class="page-title">
-            Access Denied
-        </div>
+        <div class="page-title">Access Denied</div>
         <div class="section">
-            <div class="alert-fail">
-                Permision Error: You are not logged in or do not have the right privilage to access this page
-            </div>
-            <h2>Further options:</h2>
+            <div class="alert-fail">You are not logged in or do not have the right privilege to access this page</div>
             <ul>
-                <li>If you think this is an error, please <a href="contact.php">contact the administrator</a>.
                 <li><a href="login.php">Login</a></li>
                 <li><a href="index.php">Return to Home</a></li>
             </ul>
         </div>
     </div>
 </body>
-
 </html>';
     exit();
 }
 
-/* Fetch logged-in user record */
+/* Determine which account to show (by ?userID or session user) */
 $userRow = null;
-if (isset($_SESSION['userName'])) {
+
+if (isset($_GET['userID']) && ctype_digit((string)$_GET['userID']) && (int)$_GET['userID'] > 0) {
+    $stmt = $conn->prepare("
+        SELECT userID, userName, forename, surname, yearg, emailAddress, gender, role, description
+        FROM tbluser
+        WHERE userID = :uid
+        LIMIT 1
+    ");
+    $stmt->bindValue(':uid', (int)$_GET['userID'], PDO::PARAM_INT);
+    $stmt->execute();
+    $userRow = $stmt->fetch(PDO::FETCH_ASSOC);
+} elseif (isset($_SESSION['userName'])) {
     $stmt = $conn->prepare("
         SELECT userID, userName, forename, surname, yearg, emailAddress, gender, role, description
         FROM tbluser
@@ -53,7 +54,6 @@ if (isset($_SESSION['userName'])) {
     $userRow = $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
-/* Stop if user not found (data inconsistency) */
 if (!$userRow) {
     echo '<!DOCTYPE html>
 <html lang="en">
@@ -65,7 +65,7 @@ if (!$userRow) {
 </head>
 <body>
     <div class="main-content">
-        <div class="page-title">My Account</div>
+        <div class="page-title">Account</div>
         <div class="section">
             <div class="alert-fail">Account not found. Please log out and log back in.</div>
             <ul>
@@ -82,11 +82,10 @@ if (!$userRow) {
 /* Helper: HTML escape */
 function h($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 
-/* Map role number to label */
+/* Role label */
 $roleLabel = ((int)$userRow['role'] === 2) ? 'Administrator/Coach' : 'Student';
 
-/* Static event ordering EXACTLY as in install.php (unique event names, sequence preserved) */
-/* CHANGES FOR RELAY: display list still built from install order for INDIV events; relay shown separately */
+/* Install-order event names */
 $installOrder = [
     'Backstroke 50m','Backstroke 100m','Backstroke 200m',
     'Breastroke 50m','Breastroke 100m','Breastroke 200m',
@@ -97,20 +96,26 @@ $installOrder = [
     'Freestyle Relay 400m','Medlay Relay 400m','Mixed Freestyle Relay 400m','Mixed Medlay Relay 400m'
 ];
 
-/* Initialise events array keyed by event name (all start blank), but for INDIV events only */
+/* PB data structure (INDIV only) */
 $events = [];
 foreach ($installOrder as $evName) {
-    // skip relay names for INDIV PB table:
     if (stripos($evName, 'Relay') !== false) continue;
-    $events[$evName] = [
-        'short' => null,
-        'short_date' => null,
-        'long' => null,
-        'long_date' => null
-    ];
+    $events[$evName] = ['short' => null, 'short_date' => null, 'long' => null, 'long_date' => null];
 }
 
-/* Fetch all recorded INDIV results for this swimmer */
+/* Canonical time parser "MM:SS.hh" -> centiseconds */
+function parseCanonicalToCentiseconds(string $t): ?int {
+    $t = trim($t);
+    if ($t === '') return null;
+    if (strlen($t) !== 8 || $t[2] !== ':' || $t[5] !== '.') return null;
+    $m = (int)substr($t, 0, 2);
+    $s = (int)substr($t, 3, 2);
+    $h = (int)substr($t, 6, 2);
+    if ($s < 0 || $s > 59) return null;
+    return ($m * 60 + $s) * 100 + $h;
+}
+
+/* Fetch INDIV results for this user */
 $userResults = [];
 try {
     $resStmt = $conn->prepare("
@@ -123,56 +128,45 @@ try {
     $resStmt->bindValue(':uid', (int)$userRow['userID'], PDO::PARAM_INT);
     $resStmt->execute();
     $userResults = $resStmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    /* Leave empty if failure */
-}
+} catch (PDOException $e) {}
 
-/* Convert time string "M:SS.xx" or "SS.xx" to numeric seconds for comparing best (lowest) */
-function parseSwimTime(string $t): ?float {
-    $t = trim($t);
-    if ($t === '') return null;
-    if (strpos($t, ':') !== false) {
-        $parts = explode(':', $t);
-        if (count($parts) !== 2) return null;
-        $min = (int)$parts[0];
-        $sec = (float)str_replace(',', '.', $parts[1]);
-        return $min * 60 + $sec;
-    }
-    $clean = str_replace(',', '.', $t);
-    return is_numeric($clean) ? (float)$clean : null;
-}
-
-/* Update best times (lowest) for each INDIV event/course */
+/* Compute PBs per event/course using canonical times */
 foreach ($userResults as $r) {
     $ename = $r['eventName'];
     if (!isset($events[$ename])) continue;
-    $rawTime = trim($r['time'] ?? '');
-    if ($rawTime === '') continue;
-    $numeric = parseSwimTime($rawTime);
-    if ($numeric === null) continue;
+    $cs = parseCanonicalToCentiseconds(trim($r['time'] ?? ''));
+    if ($cs === null) continue;
 
     if ($r['eventCourse'] === 'S') {
-        if ($events[$ename]['short'] === null || parseSwimTime($events[$ename]['short']) > $numeric) {
-            $events[$ename]['short'] = $rawTime;
+        $curCs = $events[$ename]['short'] ? parseCanonicalToCentiseconds($events[$ename]['short']) : null;
+        if ($curCs === null || $cs < $curCs) {
+            $events[$ename]['short'] = $r['time'];
             $events[$ename]['short_date'] = $r['meetDate'];
         }
     } elseif ($r['eventCourse'] === 'L') {
-        if ($events[$ename]['long'] === null || parseSwimTime($events[$ename]['long']) > $numeric) {
-            $events[$ename]['long'] = $rawTime;
+        $curCs = $events[$ename]['long'] ? parseCanonicalToCentiseconds($events[$ename]['long']) : null;
+        if ($curCs === null || $cs < $curCs) {
+            $events[$ename]['long'] = $r['time'];
             $events[$ename]['long_date'] = $r['meetDate'];
         }
     }
 }
 
-/* CHANGES FOR RELAY: fetch relay teams where this swimmer is a member */
+/* Relay participation (meetID+eventID schema) */
 $relayRows = [];
 try {
-    $sql = "SELECT e.eventName, e.gender, m.leg, rt.teamCode, rt.totalTime, rt.finalPlace, m.splitTime
-            FROM tblrelayTeamMember m
-            INNER JOIN tblrelayTeam rt ON rt.relayTeamID = m.relayTeamID
-            INNER JOIN tblevent e ON e.eventID = rt.eventID
-            WHERE m.userID = :uid
-            ORDER BY e.eventID ASC, rt.teamCode ASC, m.leg ASC";
+    $sql = "SELECT 
+                e.eventName, e.gender, tm.leg, rt.teamName, rt.totalTime, 
+                m.meetDate, m.meetName, m.meetID
+            FROM tblrelayTeamMember tm
+            INNER JOIN tblrelayTeam rt 
+                ON rt.meetID = tm.meetID AND rt.eventID = tm.eventID
+            INNER JOIN tblevent e 
+                ON e.eventID = tm.eventID
+            INNER JOIN tblmeet m 
+                ON m.meetID = tm.meetID
+            WHERE tm.userID = :uid
+            ORDER BY e.eventID ASC, tm.leg ASC";
     $st = $conn->prepare($sql);
     $st->bindValue(':uid', (int)$userRow['userID'], PDO::PARAM_INT);
     $st->execute();
@@ -185,7 +179,7 @@ $eventNamesOrdered = array_filter($installOrder, fn($n) => stripos($n, 'Relay') 
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Oundle School Swim Team - My Account</title>
+    <title>Oundle School Swim Team - Account</title>
     <meta name="viewport" content="width=1024, initial-scale=1">
     <link rel="stylesheet" href="style.css">
 </head>
@@ -194,7 +188,7 @@ $eventNamesOrdered = array_filter($installOrder, fn($n) => stripos($n, 'Relay') 
 <?php include 'navbar.php'; ?>
 
 <div class="main-content">
-    <div class="page-title">My Account</div>
+    <div class="page-title">Account</div>
 
     <!-- PERSONAL DETAILS -->
     <div class="section">
@@ -218,6 +212,10 @@ $eventNamesOrdered = array_filter($installOrder, fn($n) => stripos($n, 'Relay') 
                         <td><?= h($userRow['gender']) ?></td>
                     </tr>
                     <tr>
+                        <td>Year Group</td>
+                        <td><?= ((int)$userRow['yearg'] === 0) ? '—' : h($userRow['yearg']) ?></td>
+                    </tr>
+                    <tr>
                         <td>Role</td>
                         <td><?= h($roleLabel) ?></td>
                     </tr>
@@ -230,7 +228,7 @@ $eventNamesOrdered = array_filter($installOrder, fn($n) => stripos($n, 'Relay') 
         </div>
     </div>
 
-    <!-- PERSONAL BESTS (INDIV only) — dates removed as requested -->
+    <!-- PERSONAL BESTS (INDIV only) -->
     <div class="section">
         <h2>Personal Bests</h2>
         <div class="table-wrap">
@@ -255,7 +253,7 @@ $eventNamesOrdered = array_filter($installOrder, fn($n) => stripos($n, 'Relay') 
         </div>
     </div>
 
-    <!-- CHANGES FOR RELAY: show relay participations -->
+    <!-- RELAY PARTICIPATION -->
     <div class="section">
         <h2>Relay Participation</h2>
         <div class="table-wrap">
@@ -266,35 +264,31 @@ $eventNamesOrdered = array_filter($installOrder, fn($n) => stripos($n, 'Relay') 
                         <th>Team</th>
                         <th>Total Time</th>
                         <th>Leg</th>
-                        <th>Split</th>
+                        <th>Date</th>
+                        <th>Meet</th>
                     </tr>
                 </thead>
                 <tbody>
                 <?php if (empty($relayRows)): ?>
-                    <tr><td colspan="5">No relay teams recorded.</td></tr>
+                    <tr><td colspan="6">No relay teams recorded.</td></tr>
                 <?php else: ?>
                     <?php foreach ($relayRows as $rr): ?>
                         <tr>
                             <td><?= h($rr['eventName']) ?></td>
-                            <td><?= h($rr['teamCode']) ?></td>
+                            <td><?= h($rr['teamName'] ?? '') ?></td>
                             <td><?= h($rr['totalTime'] ?? '') ?></td>
                             <td><?= (int)$rr['leg'] ?></td>
-                            <td><?= h($rr['splitTime'] ?? '') ?></td>
+                            <td><?= h($rr['meetDate']) ?></td>
+                            <td>
+                                <a class="link" href="<?= 'meet.php?meetID=' . (int)$rr['meetID'] ?>">
+                                    <?= h($rr['meetName']) ?>
+                                </a>
+                            </td>
                         </tr>
                     <?php endforeach; ?>
                 <?php endif; ?>
                 </tbody>
             </table>
-        </div>
-    </div>
-
-    <!-- EXTRA SUPPORT SECTION -->
-    <div class="section">
-        <h2>Need Help?</h2>
-        <div class="extra-section">
-            Any issues with your account or results?
-            <br>
-            <a href="tools.php">Contact the administrator</a>
         </div>
     </div>
 </div>
