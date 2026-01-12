@@ -231,6 +231,7 @@ if ($rlStroke !== '' && in_array($rlStroke, $rlStrokes, true)) {
 $indTitle = ($indStroke !== '' ? ($indStroke . ' – ' . courseLabel($indCourse)) : 'Select filters and Search');
 $rlTitle  = ($rlStroke !== '' ? ($rlStroke . ' – ' . courseLabel($rlCourse)) : 'Select filters and Search');
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>

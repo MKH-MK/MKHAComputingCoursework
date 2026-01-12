@@ -4,7 +4,6 @@ include_once('connection.php');
 include_once('auth.php');
 enforceSessionPolicies($conn);
 
-// Only logged-in users (role >= 1)
 if (!isset($_SESSION['role']) || (int)$_SESSION['role'] < 1) {
     echo '<!DOCTYPE html>
 <html lang="en">
@@ -111,6 +110,7 @@ $stList->bindValue(':offset', $offset, PDO::PARAM_INT);
 $stList->execute();
 $rows = $stList->fetchAll(PDO::FETCH_ASSOC);
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>

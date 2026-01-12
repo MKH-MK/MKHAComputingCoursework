@@ -4,7 +4,7 @@ include_once('connection.php');
 include_once('auth.php');
 enforceSessionPolicies($conn);
 
-if (!isset($_SESSION['role']) || (int)$_SESSION['role'] < 1) {
+if (!isset($_SESSION['userName'])) {
     echo '<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -17,7 +17,7 @@ if (!isset($_SESSION['role']) || (int)$_SESSION['role'] < 1) {
     <div class="main-content">
         <div class="page-title">Access Denied</div>
         <div class="section">
-            <div class="alert-fail">You are not logged in or do not have the right privilege to access this page</div>
+            <div class="alert-fail">You must be logged in to view account pages.</div>
             <ul>
                 <li><a href="login.php">Login</a></li>
                 <li><a href="index.php">Return to Home</a></li>
@@ -29,32 +29,21 @@ if (!isset($_SESSION['role']) || (int)$_SESSION['role'] < 1) {
     exit();
 }
 
-/* Determine which account to show (by ?userID or session user) */
-$userRow = null;
-
-if (isset($_GET['userID']) && ctype_digit((string)$_GET['userID']) && (int)$_GET['userID'] > 0) {
-    $stmt = $conn->prepare("
-        SELECT userID, userName, forename, surname, yearg, emailAddress, gender, role, description
-        FROM tbluser
-        WHERE userID = :uid
-        LIMIT 1
-    ");
-    $stmt->bindValue(':uid', (int)$_GET['userID'], PDO::PARAM_INT);
-    $stmt->execute();
-    $userRow = $stmt->fetch(PDO::FETCH_ASSOC);
-} elseif (isset($_SESSION['userName'])) {
-    $stmt = $conn->prepare("
+/* Load the logged-in (self) user first */
+$selfRow = null;
+try {
+    $stSelf = $conn->prepare("
         SELECT userID, userName, forename, surname, yearg, emailAddress, gender, role, description
         FROM tbluser
         WHERE userName = :uname
         LIMIT 1
     ");
-    $stmt->bindValue(':uname', $_SESSION['userName'], PDO::PARAM_STR);
-    $stmt->execute();
-    $userRow = $stmt->fetch(PDO::FETCH_ASSOC);
-}
+    $stSelf->bindValue(':uname', $_SESSION['userName'], PDO::PARAM_STR);
+    $stSelf->execute();
+    $selfRow = $stSelf->fetch(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {}
 
-if (!$userRow) {
+if (!$selfRow) {
     echo '<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -79,13 +68,37 @@ if (!$userRow) {
     exit();
 }
 
+$viewerRole = (int)$selfRow['role'];
+
+$userRow = $selfRow;
+
+if ($viewerRole >= 1 && isset($_GET['userID']) && ctype_digit((string)$_GET['userID']) && (int)$_GET['userID'] > 0) {
+    $targetID = (int)$_GET['userID'];
+    if ($targetID !== (int)$selfRow['userID']) {
+        try {
+            $stTarget = $conn->prepare("
+                SELECT userID, userName, forename, surname, yearg, emailAddress, gender, role, description
+                FROM tbluser
+                WHERE userID = :uid
+                LIMIT 1
+            ");
+            $stTarget->bindValue(':uid', $targetID, PDO::PARAM_INT);
+            $stTarget->execute();
+            $targetRow = $stTarget->fetch(PDO::FETCH_ASSOC);
+            if ($targetRow) {
+                $userRow = $targetRow;
+            }
+        } catch (PDOException $e) {}
+    }
+}
+
 /* Helper: HTML escape */
 function h($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 
-/* Role label */
-$roleLabel = ((int)$userRow['role'] === 2) ? 'Administrator/Coach' : 'Student';
+/* Role label for displayed user */
+$roleLabel = ((int)$userRow['role'] === 2) ? 'Administrator/Coach' : (((int)$userRow['role'] === 1) ? 'Student' : 'Guest');
 
-/* Install-order event names */
+/* Install-order event names (INDIV only in PB table) */
 $installOrder = [
     'Backstroke 50m','Backstroke 100m','Backstroke 200m',
     'Breastroke 50m','Breastroke 100m','Breastroke 200m',
@@ -96,10 +109,9 @@ $installOrder = [
     'Freestyle Relay 400m','Medlay Relay 400m','Mixed Freestyle Relay 400m','Mixed Medlay Relay 400m'
 ];
 
-/* PB data structure (INDIV only) */
 $events = [];
 foreach ($installOrder as $evName) {
-    if (stripos($evName, 'Relay') !== false) continue;
+    if (stripos($evName, 'Relay') !== false) continue; // INDIV PBs only
     $events[$evName] = ['short' => null, 'short_date' => null, 'long' => null, 'long_date' => null];
 }
 
@@ -115,7 +127,7 @@ function parseCanonicalToCentiseconds(string $t): ?int {
     return ($m * 60 + $s) * 100 + $h;
 }
 
-/* Fetch INDIV results for this user */
+/* Fetch INDIV results for displayed user and compute PBs */
 $userResults = [];
 try {
     $resStmt = $conn->prepare("
@@ -130,7 +142,6 @@ try {
     $userResults = $resStmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {}
 
-/* Compute PBs per event/course using canonical times */
 foreach ($userResults as $r) {
     $ename = $r['eventName'];
     if (!isset($events[$ename])) continue;
