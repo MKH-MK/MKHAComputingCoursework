@@ -17,10 +17,10 @@ if (!isset($_SESSION['role']) || (int)$_SESSION['role'] < 1) {
     <div class="main-content">
         <div class="page-title">Access Denied</div>
         <div class="section">
-            <div class="alert-fail">Permision Error: You are not logged in or do not have the right privilage to access this page</div>
+            <div class="alert-fail">Permision Error: You do not have the right privilege to view this page.</div>
             <h2>Further options:</h2>
             <ul>
-                <li>If you think this is an error, please <a href="contact.php">contact the administrator</a>.
+                <li>If you think this is an error, please <a href="tool.php">contact the administrator</a>.
                 <li><a href="login.php">Login</a></li>
                 <li><a href="index.php">Return to Home</a></li>
             </ul>

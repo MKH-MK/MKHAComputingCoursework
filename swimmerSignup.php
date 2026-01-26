@@ -104,8 +104,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         <?php else: ?>
             <form action="swimmerSignup.php" method="post" autocomplete="off">
                 <div class="form-row">
-                    <input type="text" name="forename" placeholder="Forename" required>
-                    <input type="text" name="surname" placeholder="Surname" required>
+                    <input type="text" name="forename" placeholder="Forename" required pattern="^[^0-9]+$" title="No numbers allowed">
+                    <input type="text" name="surname" placeholder="Surname" required pattern="^[^0-9]+$" title="No numbers allowed">
                 </div>
 
                 <div class="form-row">

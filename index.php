@@ -31,9 +31,12 @@ enforceSessionPolicies($conn);
             </p>
         </div>
         <div class="section">
-            <h2>Placeholder</h2>
-            <p>
-                Placehodlder
+            <h2>What We Do <i class="fas fa-star style="color:#004F8B"></i></h2>
+            <p style="text-indent: 20px;">
+                All our swimmers receive high level coaching three times a week in our 50m pool (varying from it's longcourse or shortcourse configuration), paired with a dryland session prior or after twice a week.
+            </p>
+            <p style="text-indent: 20px;">
+                Our 1st team swimmers work closely with the head swimming outside the pool as well. This includes an extra swim session as well as S&C in our school's performance gym. We also have strong ties with local swim clubs, such as Kettering ASC, Rushden ASC, Croby ASC, and more, giving even more oppurtunities to the swimmers.
             </p>
         </div>
     </div>
