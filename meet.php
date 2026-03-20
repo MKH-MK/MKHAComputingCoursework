@@ -408,19 +408,9 @@ function checked($cond) { return $cond ? 'checked' : ''; }
                     <?php endforeach; ?>
                 </select>
 
-                <label class="check-item">
-                    <input type="checkbox" name="g_M" value="1" <?= checked(in_array('M', $userGenderFilters, true)) ?>> Male
-                </label>
-                <label class="check-item">
-                    <input type="checkbox" name="g_F" value="1" <?= checked(in_array('F', $userGenderFilters, true)) ?>> Female
-                </label>
-                <label class="check-item">
-                    <input type="checkbox" name="g_MIX" value="1" <?= checked(in_array('MIX', $userGenderFilters, true)) ?>> Other
-                </label>
             </div>
             <div class="toolbar-right filters-group">
                 <button type="submit" class="btn">Apply</button>
-                <a href="<?= currentUrl(['meetID' => $meetID, 'ev_indiv' => '', 'g_M'=>1, 'g_F'=>1, 'g_MIX'=>1]) ?>" class="btn btn-reset">Reset</a>
             </div>
         </form>
 
@@ -468,19 +458,9 @@ function checked($cond) { return $cond ? 'checked' : ''; }
                     <?php endforeach; ?>
                 </select>
 
-                <label class="check-item">
-                    <input type="checkbox" name="rg_M" value="1" <?= checked(in_array('M', $relayGenderFilters, true)) ?>> Male
-                </label>
-                <label class="check-item">
-                    <input type="checkbox" name="rg_F" value="1" <?= checked(in_array('F', $relayGenderFilters, true)) ?>> Female
-                </label>
-                <label class="check-item">
-                    <input type="checkbox" name="rg_MIX" value="1" <?= checked(in_array('MIX', $relayGenderFilters, true)) ?>> Other
-                </label>
             </div>
             <div class="toolbar-right filters-group">
                 <button type="submit" class="btn">Apply</button>
-                <a href="<?= currentUrl(['meetID' => $meetID, 'ev_relay' => '', 'rg_M'=>1, 'rg_F'=>1, 'rg_MIX'=>1]) ?>" class="btn btn-reset">Reset</a>
             </div>
         </form>
 

@@ -75,7 +75,7 @@ if ($userID) {
             $yearg    = isset($_POST["yearg"]) ? (int)$_POST["yearg"] : 0;
             $gender   = isset($_POST["gender"]) ? $_POST["gender"] : '';
             $description = isset($_POST["description"]) ? trim($_POST["description"]) : '';
-            $role     = isset($_POST["role"]) ? (int)$_POST["role"] : 1;
+            $role     = isset($_POST["role"]) ? (int)$_POST["role"] : 0;
 
             $newPass  = $_POST['new_passwd'] ?? '';
             $newPass2 = $_POST['confirm_new_passwd'] ?? '';

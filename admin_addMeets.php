@@ -83,6 +83,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     }
     $conn = null;
 }
+
+
+//Access Denied Block
+
 ?>
 
 <!DOCTYPE html>
@@ -97,7 +101,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
 <body>
 <?php include 'navbar.php'; ?>
-
 <div class="main-content">
     <div class="form-section">
         <h2>Meet creation</h2>

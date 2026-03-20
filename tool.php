@@ -25,6 +25,7 @@ enforceSessionPolicies($conn);
         Helpful Links
     </div>
 
+
     <div class="section">
         <h2>Time Converter <i class="fas fa-stopwatch"></i></h2>
         <p>
@@ -47,7 +48,7 @@ enforceSessionPolicies($conn);
         </p>
     </div>
 
-    <?php /* Replace your current Need Help section with this block */ ?>
+    <?php?>
         <div class="section">
             <h2>Need Help?</h2>
             <div class="extra-section">

@@ -6,7 +6,7 @@ include_once('auth.php');
 // Auto-logout on idle and force re-login if role changed mid-session
 enforceSessionPolicies($conn);
 
-// Keep your existing denied access block
+//Denied access block
 if (!isset($_SESSION['role']) || $_SESSION['role'] != 2) {
     echo '<!DOCTYPE html>
 
