@@ -2,10 +2,11 @@
 session_start();
 include_once('connection.php');
 include_once('auth.php');
-enforceSessionPolicies($conn);
+enforceSessionPolicies($conn); // Enforce session timeout + role sync before allowing admin actions
 
+// Access control: admin-only (role == 2)
 if (!isset($_SESSION['role']) || $_SESSION['role'] != 2) {
-    // Show error message and do not load the admin page content
+    // Render access denied page and stop execution if viewer is not an admin
     echo '<!DOCTYPE html>
 
 <html lang="en">
@@ -39,21 +40,25 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] != 2) {
     exit();
 }
 
-// CSRF token
+// Create a CSRF token once per session for destructive actions (delete)
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
-// Handle delete
+/* Delete handler */
+
+// Delete user request is POST-only and requires CSRF token
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete') {
     $userID = isset($_POST['userID']) && ctype_digit((string)$_POST['userID']) ? (int)$_POST['userID'] : 0;
     $csrf = $_POST['csrf_token'] ?? '';
 
+    // Reject missing/invalid IDs or CSRF mismatches
     if (!$userID || !hash_equals($_SESSION['csrf_token'] ?? '', $csrf)) {
         header("Location: admin_userList.php?err=csrf");
         exit;
     }
 
+    // Attempt delete and redirect with status flags for UI messages
     try {
         $del = $conn->prepare("DELETE FROM tbluser WHERE userID = :id");
         $del->bindValue(':id', $userID, PDO::PARAM_INT);
@@ -66,7 +71,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
-// Sorting
+/* Sort + pagination + filters */
+
 $validSort = [
     'id'   => 'userID',
     'name' => 'name',
@@ -75,6 +81,7 @@ $validSort = [
 ];
 $sort = isset($_GET['sort']) && array_key_exists($_GET['sort'], $validSort) ? $_GET['sort'] : 'id';
 
+// Convert selected sort into a concrete ORDER BY clause
 if ($sort === 'name') {
     $orderSql = 'ORDER BY surname ASC, forename ASC, userID DESC';
 } elseif ($sort === 'role') {
@@ -85,32 +92,34 @@ if ($sort === 'name') {
     $orderSql = 'ORDER BY userID DESC';
 }
 
-// Per-page & pagination
+// Per-page and current page number
 $perPage = isset($_GET['per_page']) && in_array((int)$_GET['per_page'], [20,35,50], true) ? (int)$_GET['per_page'] : 20;
 $page = isset($_GET['page']) && ctype_digit((string)$_GET['page']) && (int)$_GET['page'] > 0 ? (int)$_GET['page'] : 1;
 
-// Filters: role (0/1/2) and gender (M/F/MIX)
+// Role filters (0/1/2); default is all when no checkboxes are set
 $roleFilters = [];
 if (isset($_GET['role_0']) || isset($_GET['role_1']) || isset($_GET['role_2'])) {
     if (isset($_GET['role_0'])) $roleFilters[] = 0;
     if (isset($_GET['role_1'])) $roleFilters[] = 1;
-    if (isset($_GET['role_2'])) $roleFilters[] = 2; 
+    if (isset($_GET['role_2'])) $roleFilters[] = 2;
 } else {
-    $roleFilters = [0,1,2]; // default: all
+    $roleFilters = [0,1,2];
 }
 
+// Gender filters (M/F/MIX); default is all when no checkboxes are set
 $genderFilters = [];
 if (isset($_GET['g_M']) || isset($_GET['g_F']) || isset($_GET['g_MIX'])) {
     if (isset($_GET['g_M'])) $genderFilters[] = 'M';
     if (isset($_GET['g_F'])) $genderFilters[] = 'F';
     if (isset($_GET['g_MIX'])) $genderFilters[] = 'MIX';
 } else {
-    $genderFilters = ['M','F','MIX']; // default: all
+    $genderFilters = ['M','F','MIX'];
 }
 
-// Search
+// Optional search term across names/email/username
 $q = isset($_GET['q']) ? trim($_GET['q']) : '';
 
+// Build parameterized IN (...) placeholder lists for filters
 function buildInClause($prefix, $values) {
     $placeholders = [];
     $params = [];
@@ -122,7 +131,8 @@ function buildInClause($prefix, $values) {
     return [$placeholders, $params];
 }
 
-// WHERE building
+/* WHERE building */
+
 $where = [];
 $params = [];
 
@@ -131,7 +141,7 @@ if (!empty($roleFilters)) {
     $where[] = 'role IN (' . implode(',', $phs) . ')';
     $params = array_merge($params, $p);
 } else {
-    $where[] = '1=0';
+    $where[] = '1=0'; // If no roles are selected, force an empty result set
 }
 
 if (!empty($genderFilters)) {
@@ -139,7 +149,7 @@ if (!empty($genderFilters)) {
     $where[] = 'gender IN (' . implode(',', $phs) . ')';
     $params = array_merge($params, $p);
 } else {
-    $where[] = '1=0';
+    $where[] = '1=0'; // If no genders are selected, force an empty result set
 }
 
 if ($q !== '') {
@@ -149,9 +159,10 @@ if ($q !== '') {
 
 $whereSql = empty($where) ? '' : ('WHERE ' . implode(' AND ', $where));
 
-// Total count
+/* Count + pagination */
+
 $countSql = "SELECT COUNT(*) FROM tbluser $whereSql";
-$stmt = $conn->prepare($countSql);  
+$stmt = $conn->prepare($countSql);
 foreach ($params as $k => $v) $stmt->bindValue($k, $v);
 $stmt->execute();
 
@@ -160,7 +171,8 @@ $totalPages = max(1, (int)ceil($totalRows / $perPage));
 $page = min($page, $totalPages);
 $offset = ($page - 1) * $perPage;
 
-// Fetch list
+/* List query */
+
 $listSql = "SELECT userID, forename, surname, userName, emailAddress, yearg, gender, role 
             FROM tbluser $whereSql $orderSql LIMIT :limit OFFSET :offset";
 $stmt = $conn->prepare($listSql);
@@ -170,12 +182,18 @@ $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
 $stmt->execute();
 $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Helpers
+/* Template helpers */
+
+// Build a query-string URL preserving current filters, overriding specific keys (used by pagination/per-page links)
 function currentUrl(array $overrides = []): string {
     $q = array_merge($_GET, $overrides);
     return '?' . http_build_query($q);
 }
+
+// Helper to print HTML checked attribute for filter checkboxes
 function checked($cond) { return $cond ? 'checked' : ''; }
+
+// Convert numeric role into a human label for the table
 function roleLabel($r) {
     if ((int)$r === 2) return 'Coach/Admin';
     if ((int)$r === 1) return 'Student';
@@ -191,12 +209,13 @@ function roleLabel($r) {
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<?php include 'navbar.php'; ?>
+<?php include 'navbar.php'; ?> <!-- Shared site navigation -->
 
 <div class="main-content">
     <div class="page-title">Manage Users</div>
 
     <div class="section">
+        <!-- Status banners based on redirect query flags from actions like delete -->
         <?php if (isset($_GET['msg']) && $_GET['msg'] === 'deleted'): ?>
             <div class="alert-success">User deleted.</div>
         <?php endif; ?>
@@ -207,6 +226,7 @@ function roleLabel($r) {
             <div class="alert-fail">Delete failed due to a database error.</div>
         <?php endif; ?>
 
+        <!-- Toolbar split into search form (left) and filters/sort form (right) -->
         <div class="toolbar">
             <form method="get" class="toolbar-left search-bar">
                 <input type="text" name="q" value="<?= htmlspecialchars($q) ?>" placeholder="Search name, username, or email...">
@@ -221,6 +241,7 @@ function roleLabel($r) {
                     <option value="year" <?= $sort==='year'?'selected':'' ?>>Year Group</option>
                 </select>
 
+                <!-- Role filter checkboxes -->
                 <label class="check-item">
                     <input type="checkbox" name="role_2" value="1" <?= checked(in_array(2, $roleFilters, true)) ?>> Coach/Admin
                 </label>
@@ -231,6 +252,7 @@ function roleLabel($r) {
                     <input type="checkbox" name="role_0" value="1" <?= checked(in_array(0, $roleFilters, true)) ?>> Guest
                 </label>
 
+                <!-- Gender filter checkboxes -->
                 <label class="check-item">
                     <input type="checkbox" name="g_M" value="1" <?= checked(in_array('M', $genderFilters, true)) ?>> Male
                 </label>
@@ -241,6 +263,7 @@ function roleLabel($r) {
                     <input type="checkbox" name="g_MIX" value="1" <?= checked(in_array('MIX', $genderFilters, true)) ?>> Other
                 </label>
 
+                <!-- Preserve search term when applying non-search filters -->
                 <?php if ($q !== ''): ?>
                     <input type="hidden" name="q" value="<?= htmlspecialchars($q) ?>">
                 <?php endif; ?>
@@ -250,6 +273,7 @@ function roleLabel($r) {
             </form>
         </div>
 
+        <!-- User list table with edit/delete actions -->
         <div class="table-wrap">
             <table class="meets">
                 <thead>
@@ -281,6 +305,7 @@ function roleLabel($r) {
                                 <div class="action-buttons">
                                     <a class="btn" href="admin_userEditor.php?edit=<?= urlencode($u['userID']) ?>">Edit</a>
 
+                                    <!-- Delete posts back to this page and includes CSRF token -->
                                     <form method="post" class="js-confirm-delete">
                                         <input type="hidden" name="action" value="delete">
                                         <input type="hidden" name="userID" value="<?= (int)$u['userID'] ?>">
@@ -295,6 +320,7 @@ function roleLabel($r) {
                 </tbody>
             </table>
 
+            <!-- Pagination links preserve current filters via currentUrl() -->
             <?php if ($totalPages > 1): ?>
                 <div class="pagination">
                     <?php
@@ -307,6 +333,7 @@ function roleLabel($r) {
                 </div>
             <?php endif; ?>
 
+            <!-- Per-page quick links reset to page 1 -->
             <div class="per-page">
                 <span class="per-page-label">Entries:</span>
                 <a class="btn <?= $perPage===20?'btn-active':'' ?>" href="<?= currentUrl(['per_page'=>20, 'page'=>1]) ?>">20</a>
@@ -318,6 +345,7 @@ function roleLabel($r) {
 </div>
 
 <script>
+// Confirm dialog for delete forms to reduce accidental deletions
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('form.js-confirm-delete').forEach(function(form) {
         form.addEventListener('submit', function(e) {

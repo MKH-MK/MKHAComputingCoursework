@@ -3,11 +3,12 @@ session_start();
 include_once('connection.php');
 include_once('auth.php');
 
-// Auto-logout on idle and force re-login if role changed mid-session
+// Apply session policies (idle timeout + keep session role synced with DB)
 enforceSessionPolicies($conn);
 
-//Denied access block
+// Access control: this page is admin-only (role == 2)
 if (!isset($_SESSION['role']) || $_SESSION['role'] != 2) {
+    // Render an access-denied page and stop execution if the viewer is not an admin
     echo '<!DOCTYPE html>
 
 <html lang="en">
@@ -44,7 +45,6 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] != 2) {
 
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <title>Oundle School Swim Team - Admin Index</title>
@@ -53,13 +53,17 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] != 2) {
 </head>
 
 <body>
-    <?php include 'navbar.php'; ?>
+    <?php include 'navbar.php'; ?> <!-- Shared site navigation -->
+
     <div class="main-content">
         <div class="page-title">
             Admin Section
         </div>
+
+        <!-- Admin landing page: provides links to meet management and user management tools -->
         <div class="section">
             <h2>Admin Tools</h2>
+
             <p>Meet tools:</p>
             <ul>
                 <li><a href="admin_addMeets.php">Add Meets</a></li>
@@ -72,7 +76,6 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] != 2) {
                 <li><a href="admin_userList.php">Users List</a></li>
                 <li><a href="admin_rollOverUser.php">Roll Over Users</a></li>
             </ul>
-
         </div>
     </div>
 </body>

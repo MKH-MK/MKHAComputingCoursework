@@ -20,6 +20,8 @@ enforceSessionPolicies($conn);
     
     <?php include 'navbar.php';?>
     
+<!-- Homepage content, change as required, section denotes a new point of information -->
+ 
     <div class="main-content">
         <div class="page-title">
             Welcome to the Oundle School Swim Team

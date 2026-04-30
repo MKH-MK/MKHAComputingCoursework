@@ -2,10 +2,11 @@
 session_start();
 include_once('connection.php');
 include_once('auth.php');
-enforceSessionPolicies($conn);
+enforceSessionPolicies($conn); // Enforce session timeout + role sync before allowing admin actions
 
+// Access control: admin-only (role == 2)
 if (!isset($_SESSION['role']) || $_SESSION['role'] != 2) {
-    // Show error message and do not load the admin page content
+    // Render access denied page and stop execution if viewer is not an admin
     echo '<!DOCTYPE html>
 
 <html lang="en">
@@ -39,7 +40,7 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] != 2) {
     exit();
 }
 
-// CSRF token
+// Create a CSRF token once per session for updates
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
@@ -48,7 +49,9 @@ $error_message = '';
 $success_message = '';
 $user = null;
 
-// Validate ID
+/* Resolve userID */
+
+// Validate the user ID from GET (initial load) or POST (save action)
 if (isset($_GET['edit']) && ctype_digit((string)$_GET['edit'])) {
     $userID = (int)$_GET['edit'];
 } elseif (isset($_POST['userID']) && ctype_digit((string)$_POST['userID'])) {
@@ -58,8 +61,9 @@ if (isset($_GET['edit']) && ctype_digit((string)$_GET['edit'])) {
     $userID = 0;
 }
 
+/* POST update handler */
+
 if ($userID) {
-    // Handle POST update
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             // Validate CSRF
@@ -68,7 +72,7 @@ if ($userID) {
                 throw new Exception("Invalid session token. Please try again.");
             }
 
-            // Collect inputs
+            // Collect and normalize inputs
             $forename = isset($_POST["forename"]) ? trim($_POST["forename"]) : '';
             $surname  = isset($_POST["surname"]) ? trim($_POST["surname"]) : '';
             $email    = isset($_POST["email"]) ? trim($_POST["email"]) : '';
@@ -80,10 +84,12 @@ if ($userID) {
             $newPass  = $_POST['new_passwd'] ?? '';
             $newPass2 = $_POST['confirm_new_passwd'] ?? '';
 
+            // Required field validation
             if ($forename === '' || $surname === '') {
                 throw new Exception("Forename and surname are required.");
             }
 
+            // Email validation + domain restriction
             if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 throw new Exception("Invalid email format.");
             }
@@ -94,11 +100,12 @@ if ($userID) {
                 throw new Exception("Email must be a valid school email address");
             }
 
+            // Gender validation
             if (!in_array($gender, ['M','F','MIX'], true)) {
                 throw new Exception("Please select a valid gender.");
             }
 
-            // CHANGE: Role-based year group validation
+            // Role + year group validation rules
             if (!in_array($role, [0,1,2], true)) {
                 throw new Exception("Invalid role selected.");
             }
@@ -110,17 +117,19 @@ if ($userID) {
                 if ($yearg !== 0) throw new Exception("Guests must have Year Group = 0.");
             }
 
+            // Description length limit
             if (strlen($description) > 400) {
                 throw new Exception("Description cannot exceed 400 characters.");
             }
 
+            // Optional password reset validation
             if ($newPass !== '' || $newPass2 !== '') {
                 if ($newPass !== $newPass2) {
                     throw new Exception("New passwords do not match.");
                 }
             }
 
-            // Unique email check (excluding current user)
+            // Ensure email is unique (excluding current user)
             $email_check = $conn->prepare("SELECT COUNT(*) FROM tbluser WHERE emailAddress = :email AND userID <> :id");
             $email_check->bindValue(':email', $email);
             $email_check->bindValue(':id', $userID, PDO::PARAM_INT);
@@ -129,9 +138,10 @@ if ($userID) {
                 throw new Exception("Another account already exists with this email.");
             }
 
+            // Derive username from email local-part
             $userName = substr($email, 0, strpos($email, '@'));
 
-            // Build update
+            // Build update statement (include passwd only if resetting password)
             if ($newPass !== '') {
                 $hashed_password = password_hash($newPass, PASSWORD_DEFAULT);
                 $sql = "UPDATE tbluser
@@ -181,7 +191,8 @@ if ($userID) {
         }
     }
 
-    // Load user for display (or reload after save)
+    /* Load user for display (and after save) */
+
     try {
         $stmt = $conn->prepare("SELECT userID, forename, surname, emailAddress, userName, yearg, gender, role, description FROM tbluser WHERE userID = :id");
         $stmt->bindValue(':id', $userID, PDO::PARAM_INT);
@@ -204,7 +215,7 @@ if ($userID) {
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<?php include 'navbar.php'; ?>
+<?php include 'navbar.php'; ?> <!-- Shared site navigation -->
 
 <div class="main-content">
     <div class="form-section">
@@ -234,14 +245,15 @@ if ($userID) {
                 </div>
 
                 <div class="form-row form-row--center">
-                    <!-- CHANGE: allow 0 for Staff/Admin and Guest -->
                     <input type="number" name="yearg" class="input-small" placeholder="Year Group" min="0" max="13" required value="<?= (int)$user['yearg'] ?>">
+
                     <select name="gender" class="input-small" required>
                         <option value="" disabled>Gender</option>
                         <option value="M" <?= $user['gender']==='M'?'selected':'' ?>>Male</option>
                         <option value="F" <?= $user['gender']==='F'?'selected':'' ?>>Female</option>
                         <option value="MIX" <?= $user['gender']==='MIX'?'selected':'' ?>>Other</option>
                     </select>
+
                     <select name="role" class="input-small" required>
                         <option value="" disabled>Role</option>
                         <option value="0" <?= (int)$user['role']===0?'selected':'' ?>>Guest</option>
@@ -269,7 +281,4 @@ if ($userID) {
                 <a class="btn" href="admin_userList.php">Back to User List</a>
             </div>
         <?php endif; ?>
-    </div>
-</div>
-</body>
-</html>
+    

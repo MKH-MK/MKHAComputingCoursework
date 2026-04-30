@@ -2,10 +2,11 @@
 session_start();
 include_once('connection.php');
 include_once('auth.php');
-enforceSessionPolicies($conn);
+enforceSessionPolicies($conn); // Enforce session timeout + role sync before allowing admin actions
 
+// Access control: admin-only (role == 2)
 if (!isset($_SESSION['role']) || $_SESSION['role'] != 2) {
-    // Show error message and do not load the admin page content
+    // Render access denied page and stop execution if viewer is not an admin
     echo '<!DOCTYPE html>
 
 <html lang="en">
@@ -39,26 +40,29 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] != 2) {
     exit();
 }
 
+// If a meet ID is provided as "edit", redirect straight into the editor view for that meet
 if (isset($_GET['edit']) && ctype_digit((string)$_GET['edit'])) {
     header("Location: admin_meetEditor.php?edit=" . urlencode($_GET['edit']));
     exit;
 }
 
-// CSRF token for destructive actions
+// Create a CSRF token once per session for destructive actions (delete)
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
-// Handle delete
+// Handle meet deletion requests (POST only, requires CSRF token)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete') {
     $meetID = isset($_POST['meetID']) && ctype_digit((string)$_POST['meetID']) ? (int)$_POST['meetID'] : 0;
     $csrf = $_POST['csrf_token'] ?? '';
 
+    // Reject missing/invalid meet IDs or CSRF token mismatches
     if (!$meetID || !hash_equals($_SESSION['csrf_token'] ?? '', $csrf)) {
         header("Location: admin_meetList.php?err=csrf");
         exit;
     }
 
+    // Attempt delete and redirect with status flags for UI messages
     try {
         $del = $conn->prepare("DELETE FROM tblmeet WHERE meetID = :id");
         $del->bindValue(':id', $meetID, PDO::PARAM_INT);
@@ -71,11 +75,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
-// Params
+/* List params: sort + pagination + filters */
+
 $validSort = ['id' => 'meetID', 'name' => 'meetName', 'date' => 'meetDate'];
 $sort = isset($_GET['sort']) && array_key_exists($_GET['sort'], $validSort) ? $_GET['sort'] : 'id';
 
-// Direction fixed: created/date = DESC, name = ASC
+// Convert selected sort into a concrete ORDER BY clause (name ascending; other sorts newest first)
 if ($sort === 'name') {
     $orderSql = 'ORDER BY meetName ASC, meetID DESC';
 } elseif ($sort === 'date') {
@@ -84,32 +89,32 @@ if ($sort === 'name') {
     $orderSql = 'ORDER BY meetID DESC';
 }
 
-// Per-page & pagination
+// Per-page and page number (page must be positive integer; per-page restricted to fixed options)
 $perPage = isset($_GET['per_page']) && in_array((int)$_GET['per_page'], [20,35,50], true) ? (int)$_GET['per_page'] : 20;
 $page = isset($_GET['page']) && ctype_digit((string)$_GET['page']) && (int)$_GET['page'] > 0 ? (int)$_GET['page'] : 1;
 
-// Filters: course (L/S) and external (Y/N)
+// Course filters (L/S) default to both when no checkboxes are set
 $courseFilters = [];
 if (isset($_GET['course_L']) || isset($_GET['course_S'])) {
     if (isset($_GET['course_L'])) $courseFilters[] = 'L';
     if (isset($_GET['course_S'])) $courseFilters[] = 'S';
 } else {
-    // default: both selected
     $courseFilters = ['L', 'S'];
 }
 
+// External filters (Y/N) default to both when no checkboxes are set
 $externalFilters = [];
 if (isset($_GET['ext_Y']) || isset($_GET['ext_N'])) {
     if (isset($_GET['ext_Y'])) $externalFilters[] = 'Y';
     if (isset($_GET['ext_N'])) $externalFilters[] = 'N';
 } else {
-    // default: both selected
     $externalFilters = ['Y', 'N'];
 }
 
-// Search
+// Optional meet name search term
 $q = isset($_GET['q']) ? trim($_GET['q']) : '';
 
+// Build a parameterized IN (...) clause (placeholders + binds) from a list of allowed values
 function buildInClause($prefix, $values) {
     $placeholders = [];
     $params = [];
@@ -121,7 +126,8 @@ function buildInClause($prefix, $values) {
     return [$placeholders, $params];
 }
 
-// WHERE
+/* WHERE construction (shared by count + list queries) */
+
 $where = [];
 $params = [];
 
@@ -130,7 +136,7 @@ if (!empty($courseFilters)) {
     $where[] = 'course IN (' . implode(',', $phs) . ')';
     $params = array_merge($params, $p);
 } else {
-    $where[] = '1=0';
+    $where[] = '1=0'; // If no course options are selected, force an empty result set
 }
 
 if (!empty($externalFilters)) {
@@ -138,28 +144,33 @@ if (!empty($externalFilters)) {
     $where[] = 'external IN (' . implode(',', $phs) . ')';
     $params = array_merge($params, $p);
 } else {
-    $where[] = '1=0';
+    $where[] = '1=0'; // If no external options are selected, force an empty result set
 }
 
 if ($q !== '') {
-    $where[] = 'meetName LIKE :q';
+    $where[] = 'meetName LIKE :q'; // Search meet names by substring
     $params[':q'] = '%' . $q . '%';
 }
 
 $whereSql = empty($where) ? '' : ('WHERE ' . implode(' AND ', $where));
 
-// Total
+/* Count + pagination */
+
+// Count total rows that match current filters for pagination
 $countSql = "SELECT COUNT(*) FROM tblmeet $whereSql";
 $stmt = $conn->prepare($countSql);
 foreach ($params as $k => $v) $stmt->bindValue($k, $v);
 $stmt->execute();
 $totalRows = (int)$stmt->fetchColumn();
 
+// Clamp page number to a valid range and compute LIMIT/OFFSET
 $totalPages = max(1, (int)ceil($totalRows / $perPage));
 $page = min($page, $totalPages);
 $offset = ($page - 1) * $perPage;
 
-// List
+/* List query */
+
+// Fetch the meets for the current page using filters + order + limit/offset
 $listSql = "SELECT meetID, meetName, meetDate, external, course FROM tblmeet $whereSql $orderSql LIMIT :limit OFFSET :offset";
 $stmt = $conn->prepare($listSql);
 foreach ($params as $k => $v) $stmt->bindValue($k, $v);
@@ -168,11 +179,15 @@ $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
 $stmt->execute();
 $meets = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Helpers
+/* Template helpers */
+
+// Build a query-string URL preserving current filters, overriding specific keys (used by pagination/per-page links)
 function currentUrl(array $overrides = []): string {
     $q = array_merge($_GET, $overrides);
     return '?' . http_build_query($q);
 }
+
+// Helper to print HTML checked attribute for filter checkboxes
 function checked($cond) { return $cond ? 'checked' : ''; }
 ?>
 <!DOCTYPE html>
@@ -184,12 +199,13 @@ function checked($cond) { return $cond ? 'checked' : ''; }
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<?php include 'navbar.php'; ?>
+<?php include 'navbar.php'; ?> <!-- Shared site navigation -->
 
 <div class="main-content">
     <div class="page-title">Manage Meets</div>
 
     <div class="section">
+        <!-- Status banners based on redirect query flags from actions like delete -->
         <?php if (isset($_GET['msg']) && $_GET['msg'] === 'deleted'): ?>
             <div class="alert-success">Meet deleted.</div>
         <?php endif; ?>
@@ -200,6 +216,7 @@ function checked($cond) { return $cond ? 'checked' : ''; }
             <div class="alert-fail">Delete failed due to a database error.</div>
         <?php endif; ?>
 
+        <!-- Toolbar split into search form (left) and filters/sort form (right) -->
         <div class="toolbar">
             <form method="get" class="toolbar-left search-bar">
                 <input type="text" name="q" value="<?= htmlspecialchars($q) ?>" placeholder="Search meet name...">
@@ -213,6 +230,7 @@ function checked($cond) { return $cond ? 'checked' : ''; }
                     <option value="name" <?= $sort==='name'?'selected':'' ?>>Alphabetical</option>
                 </select>
 
+                <!-- Filter checkboxes map to the IN(...) filter lists built above -->
                 <label class="check-item">
                     <input type="checkbox" name="course_L" value="1" <?= checked(in_array('L', $courseFilters, true)) ?>> Longcourse
                 </label>
@@ -226,6 +244,7 @@ function checked($cond) { return $cond ? 'checked' : ''; }
                     <input type="checkbox" name="ext_N" value="1" <?= checked(in_array('N', $externalFilters, true)) ?>> School
                 </label>
 
+                <!-- Preserve search term when applying non-search filters -->
                 <?php if ($q !== ''): ?>
                     <input type="hidden" name="q" value="<?= htmlspecialchars($q) ?>">
                 <?php endif; ?>
@@ -235,6 +254,7 @@ function checked($cond) { return $cond ? 'checked' : ''; }
             </form>
         </div>
 
+        <!-- Meet list table with action buttons for edit and delete -->
         <div class="table-wrap">
             <table class="meets">
                 <thead>
@@ -260,6 +280,7 @@ function checked($cond) { return $cond ? 'checked' : ''; }
                                 <div class="action-buttons">
                                     <a class="btn" href="admin_meetEditor.php?edit=<?= urlencode($m['meetID']) ?>">Edit</a>
 
+                                    <!-- Delete posts back to this page and includes CSRF token for protection -->
                                     <form method="post" class="js-confirm-delete">
                                         <input type="hidden" name="action" value="delete">
                                         <input type="hidden" name="meetID" value="<?= (int)$m['meetID'] ?>">
@@ -274,6 +295,7 @@ function checked($cond) { return $cond ? 'checked' : ''; }
                 </tbody>
             </table>
 
+            <!-- Pagination links preserve current filters via currentUrl() -->
             <?php if ($totalPages > 1): ?>
                 <div class="pagination">
                     <?php
@@ -286,6 +308,7 @@ function checked($cond) { return $cond ? 'checked' : ''; }
                 </div>
             <?php endif; ?>
 
+            <!-- Per-page quick links reset to page 1 to avoid out-of-range pages -->
             <div class="per-page">
                 <span class="per-page-label">Entries:</span>
                 <a class="btn <?= $perPage===20?'btn-active':'' ?>" href="<?= currentUrl(['per_page'=>20, 'page'=>1]) ?>">20</a>
@@ -297,6 +320,7 @@ function checked($cond) { return $cond ? 'checked' : ''; }
 </div>
 
 <script>
+// Confirm dialog for delete forms to reduce accidental deletions
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('form.js-confirm-delete').forEach(function(form) {
         form.addEventListener('submit', function(e) {

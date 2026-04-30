@@ -278,6 +278,7 @@ try {
 
     echo "<br>Database created successfully";
 
+//If any failure is caught, displays message
 } catch(PDOException $e) {
     echo "<br>Database setup failed: " . $e->getMessage();
 }

@@ -159,7 +159,7 @@
 
 /* Center submit buttons inside .form-section forms */
 .form-section button[type="submit"] {
-    width: auto;                     /* CHANGE: was full-width somewhere; make natural width */
+    width: auto;                     /* CHANGE: was full-width somewhere, make natural width */
     display: block;                  /* CHANGE: allow auto margins to center */
     margin: 0.5rem auto;             /* CHANGE: center horizontally */
 }

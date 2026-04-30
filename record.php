@@ -2,9 +2,11 @@
 session_start();
 include_once('connection.php');
 include_once('auth.php');
-enforceSessionPolicies($conn);
+enforceSessionPolicies($conn); // Apply shared session rules before continuing
 
+// Access control: only allow logged-in users with role >= 1
 if (!isset($_SESSION['role']) || (int)$_SESSION['role'] < 1) {
+    // Render an access-denied page and stop execution
     echo '<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -32,15 +34,20 @@ if (!isset($_SESSION['role']) || (int)$_SESSION['role'] < 1) {
 }
 
 /* Helpers */
+
+// Build a query-string URL from current filters, overriding specific keys (used for pagination/per-page links)
 function currentUrl(array $overrides = []): string {
     $q = array_merge($_GET, $overrides);
     return '?' . http_build_query($q);
 }
+
+// Helper to print HTML "selected" attribute based on a boolean condition
 function selected($cond) { return $cond ? 'selected' : ''; }
 
+// Convert stored course code into the label used in headings/subtitles
 function courseLabel(string $c): string { return $c === 'L' ? 'Longcourse' : 'Shortcourse'; }
 
-// School year: start 31 Aug (inclusive) to 30 Aug next year (inclusive)
+// Compute start/end dates for the current school year window used by the "School Year" period filter
 function computeSchoolYearRange(DateTime $today, DateTimeZone $tz): array {
     $year = (int)$today->format('Y');
     $startThisYear = new DateTime("$year-08-31", $tz);
@@ -54,7 +61,7 @@ function computeSchoolYearRange(DateTime $today, DateTimeZone $tz): array {
     return [$start->format('Y-m-d'), $end->format('Y-m-d')];
 }
 
-/* Stroke options ordered by PK (eventID) */
+// Fetch distinct event names for a course+eventType and order them by their first (lowest) eventID for stable dropdown ordering
 function getStrokesByPK(PDO $conn, string $course, string $etype): array {
     $sql = "SELECT eventName, MIN(eventID) AS firstID
             FROM tblevent
@@ -69,6 +76,8 @@ function getStrokesByPK(PDO $conn, string $course, string $etype): array {
 }
 
 /* Individual filters (GET) */
+
+// Individual record search inputs (course/stroke/gender/period/year-group + pagination)
 $indCourse = (isset($_GET['ind_course']) && in_array($_GET['ind_course'], ['L','S'], true)) ? $_GET['ind_course'] : 'L';
 $indStroke = isset($_GET['ind_stroke']) ? trim($_GET['ind_stroke']) : '';
 $indGender = (isset($_GET['ind_gender']) && in_array($_GET['ind_gender'], ['M','F'], true)) ? $_GET['ind_gender'] : 'M';
@@ -78,6 +87,8 @@ $indPerPage = (isset($_GET['ind_per_page']) && in_array((int)$_GET['ind_per_page
 $indPage = (isset($_GET['ind_page']) && ctype_digit((string)$_GET['ind_page']) && (int)$_GET['ind_page'] > 0) ? (int)$_GET['ind_page'] : 1;
 
 /* Relay filters (GET) */
+
+// Relay record search inputs (course/stroke/gender/period + pagination)
 $rlCourse = (isset($_GET['rl_course']) && in_array($_GET['rl_course'], ['L','S'], true)) ? $_GET['rl_course'] : 'L';
 $rlStroke = isset($_GET['rl_stroke']) ? trim($_GET['rl_stroke']) : '';
 $rlGender = (isset($_GET['rl_gender']) && in_array($_GET['rl_gender'], ['M','F','MIX'], true)) ? $_GET['rl_gender'] : 'M';
@@ -86,23 +97,32 @@ $rlPerPage = (isset($_GET['rl_per_page']) && in_array((int)$_GET['rl_per_page'],
 $rlPage = (isset($_GET['rl_page']) && ctype_digit((string)$_GET['rl_page']) && (int)$_GET['rl_page'] > 0) ? (int)$_GET['rl_page'] : 1;
 
 /* Stroke options (ordered by PK) */
+
+// Populate dropdown options based on currently selected course (so "stroke/event" list matches course selection)
 $indStrokeOpts = getStrokesByPK($conn, $indCourse, 'INDIV'); // array of ['eventName','firstID']
 $rlStrokeOpts  = getStrokesByPK($conn, $rlCourse, 'RELAY');
 
 /* Flatten names for validation */
+
+// Build lists of valid eventName values to validate the incoming GET stroke names
 $indStrokes = array_map(fn($r) => $r['eventName'], $indStrokeOpts);
 $rlStrokes  = array_map(fn($r) => $r['eventName'], $rlStrokeOpts);
 
 /* Date range for school year */
+
+// Pre-compute school-year date window used when period=school
 $tz = new DateTimeZone('Europe/London');
 [$schoolStart, $schoolEnd] = computeSchoolYearRange(new DateTime('now', $tz), $tz);
 
 /* Individual results */
+
+// Individual records query results + total rows for pagination
 $indResults = [];
 $indTotalRows = 0;
 
+// Only run the record query when a stroke is chosen and it is valid for the selected course
 if ($indStroke !== '' && in_array($indStroke, $indStrokes, true)) {
-    // Count
+    // Count matching swims so pagination can be calculated
     $countSql = "SELECT COUNT(*) 
                  FROM tblmeetEventHasSwimmer ms
                  INNER JOIN tblevent e ON e.eventID = ms.eventID
@@ -115,7 +135,7 @@ if ($indStroke !== '' && in_array($indStroke, $indStrokes, true)) {
                    AND " . ($indGender === 'M' ? "u.gender IN ('M','MIX')" : "u.gender = 'F'") . "
                    " . ($indPeriod === 'school' ? "AND m.meetDate BETWEEN :ds AND :de" : "") . "
                    " . ($indYearg !== null ? "AND ms.yeargAtEvent = :yg" : "");
-    $countSql = str_replace('INNER INNER JOIN', 'INNER JOIN', $countSql);
+    $countSql = str_replace('INNER INNER JOIN', 'INNER JOIN', $countSql); // Normalize join keyword in the assembled SQL string
     $stCount = $conn->prepare($countSql);
     $stCount->bindValue(':c', $indCourse);
     $stCount->bindValue(':stroke', $indStroke);
@@ -128,11 +148,12 @@ if ($indStroke !== '' && in_array($indStroke, $indStrokes, true)) {
     $stCount->execute();
     $indTotalRows = (int)$stCount->fetchColumn();
 
+    // Clamp page and compute LIMIT/OFFSET for the list query
     $indTotalPages = max(1, (int)ceil($indTotalRows / $indPerPage));
     $indPage = min($indPage, $indTotalPages);
     $indOffset = ($indPage - 1) * $indPerPage;
 
-    // List
+    // Fetch the matching swims ordered by fastest time (time parsed as mm:ss:cc style components) then by meet date
     $listSql = "SELECT 
                     u.userID, u.forename, u.surname, ms.yeargAtEvent, ms.time, 
                     m.meetDate, m.meetName, m.meetID
@@ -169,9 +190,14 @@ if ($indStroke !== '' && in_array($indStroke, $indStrokes, true)) {
 }
 
 /* Relay results */
+
+// Relay records query results + total rows for pagination
 $rlResults = [];
 $rlTotalRows = 0;
+
+// Only run the relay record query when a relay event is chosen and valid for the selected course
 if ($rlStroke !== '' && in_array($rlStroke, $rlStrokes, true)) {
+    // Count matching relay teams so pagination can be calculated
     $countSql = "SELECT COUNT(*) 
                  FROM tblrelayTeam rt
                  INNER JOIN tblevent e ON e.eventID = rt.eventID
@@ -181,7 +207,7 @@ if ($rlStroke !== '' && in_array($rlStroke, $rlStrokes, true)) {
                    AND e.eventName = :stroke
                    AND e.gender = :evgender
                    " . ($rlPeriod === 'school' ? "AND m.meetDate BETWEEN :ds AND :de" : "");
-    $countSql = str_replace('INNERJOIN', 'INNER JOIN', $countSql);
+    $countSql = str_replace('INNERJOIN', 'INNER JOIN', $countSql); // Normalize join keyword in the assembled SQL string
     $stCount = $conn->prepare($countSql);
     $stCount->bindValue(':c', $rlCourse);
     $stCount->bindValue(':stroke', $rlStroke);
@@ -193,10 +219,12 @@ if ($rlStroke !== '' && in_array($rlStroke, $rlStrokes, true)) {
     $stCount->execute();
     $rlTotalRows = (int)$stCount->fetchColumn();
 
+    // Clamp page and compute LIMIT/OFFSET for the list query
     $rlTotalPages = max(1, (int)ceil($rlTotalRows / $rlPerPage));
     $rlPage = min($rlPage, $rlTotalPages);
     $rlOffset = ($rlPage - 1) * $rlPerPage;
 
+    // Fetch relay teams ordered by fastest total time (parsed into numeric components) then by meet date
     $listSql = "SELECT 
                     rt.teamName, rt.totalTime, m.meetDate, m.meetName, m.meetID
                 FROM tblrelayTeam rt
@@ -228,6 +256,8 @@ if ($rlStroke !== '' && in_array($rlStroke, $rlStrokes, true)) {
 }
 
 /* Titles */
+
+// Subtitle strings shown above each results table
 $indTitle = ($indStroke !== '' ? ($indStroke . ' – ' . courseLabel($indCourse)) : 'Select filters and Search');
 $rlTitle  = ($rlStroke !== '' ? ($rlStroke . ' – ' . courseLabel($rlCourse)) : 'Select filters and Search');
 ?>
@@ -246,7 +276,7 @@ $rlTitle  = ($rlStroke !== '' ? ($rlStroke . ' – ' . courseLabel($rlCourse)) :
 <div class="main-content">
     <div class="page-title">Records</div>
 
-    <!-- INDIVIDUAL RECORDS -->
+    <!-- Individual record search form + results table -->
     <div class="section">
         <h2>Individual Records</h2>
         <form method="get" class="form-section form-section--wide">
@@ -296,8 +326,7 @@ $rlTitle  = ($rlStroke !== '' ? ($rlStroke . ' – ' . courseLabel($rlCourse)) :
                 </select>
             </div>
 
-            <!-- Always start on page 1 for each search -->
-            <input type="hidden" name="ind_page" value="1">
+            <input type="hidden" name="ind_page" value="1"> <!-- Reset individual pagination on new search -->
 
             <div class="form-row form-row--center">
                 <button type="submit" class="btn">Search</button>
@@ -342,6 +371,7 @@ $rlTitle  = ($rlStroke !== '' ? ($rlStroke . ' – ' . courseLabel($rlCourse)) :
                 </tbody>
             </table>
 
+            <!-- Individual pagination controls preserve current filters via currentUrl() -->
             <?php if ($indTotalRows > $indPerPage): ?>
                 <?php
                     $indTotalPages = max(1, (int)ceil($indTotalRows / $indPerPage));
@@ -363,7 +393,7 @@ $rlTitle  = ($rlStroke !== '' ? ($rlStroke . ' – ' . courseLabel($rlCourse)) :
         </div>
     </div>
 
-    <!-- RELAY RECORDS -->
+    <!-- Relay record search form + results table -->
     <div class="section">
         <h2>Relay Records</h2>
         <form method="get" class="form-section form-section--wide">
@@ -404,8 +434,7 @@ $rlTitle  = ($rlStroke !== '' ? ($rlStroke . ' – ' . courseLabel($rlCourse)) :
                 </select>
             </div>
 
-            <!-- Always start on page 1 for each search -->
-            <input type="hidden" name="rl_page" value="1">
+            <input type="hidden" name="rl_page" value="1"> <!-- Reset relay pagination on new search -->
 
             <div class="form-row form-row--center">
                 <button type="submit" class="btn">Search</button>
@@ -444,6 +473,7 @@ $rlTitle  = ($rlStroke !== '' ? ($rlStroke . ' – ' . courseLabel($rlCourse)) :
                 </tbody>
             </table>
 
+            <!-- Relay pagination controls preserve current filters via currentUrl() -->
             <?php if ($rlTotalRows > $rlPerPage): ?>
                 <?php
                     $rlTotalPages = max(1, (int)ceil($rlTotalRows / $rlPerPage));
@@ -464,6 +494,3 @@ $rlTitle  = ($rlStroke !== '' ? ($rlStroke . ' – ' . courseLabel($rlCourse)) :
             </div>
         </div>
     </div>
-</div>
-</body>
-</html>

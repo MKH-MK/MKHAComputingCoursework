@@ -2,10 +2,11 @@
 session_start();
 include_once('connection.php');
 include_once('auth.php');
-enforceSessionPolicies($conn);
+enforceSessionPolicies($conn); // Apply session timeout + role sync before allowing admin actions
 
+// Access control: admin-only (role == 2)
 if (!isset($_SESSION['role']) || $_SESSION['role'] != 2) {
-    // Show error message and do not load the admin page content
+    // Render access denied page and stop execution if viewer is not an admin
     echo '<!DOCTYPE html>
 
 <html lang="en">
@@ -41,15 +42,17 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] != 2) {
 
 $error_message = '';
 
+// Handle meet creation submission (insert meet and redirect to editor)
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
     try {
-        //
+        // Read and normalize form inputs
         $meetName = isset($_POST["meetName"]) ? trim($_POST["meetName"]) : '';
         $meetDate = isset($_POST["meetDate"]) ? trim($_POST["meetDate"]) : '';
         $meetInfo = isset($_POST["meetInfo"]) ? trim($_POST["meetInfo"]) : '';
         $external = isset($_POST["external"]) ? $_POST["external"] : 'N';
         $course   = isset($_POST["course"]) ? $_POST["course"] : 'L';
 
+        // Server-side validation for required fields and length limits
         if ($meetName === '' || $meetDate === '') {
             throw new Exception("Name and date are required.");
         }
@@ -60,7 +63,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             throw new Exception("Description cannot exceed 400 characters.");
         }
 
-        // Insert meet (store raw values; escape only when outputting)
+        // Insert the meet record into tblmeet (escaping happens at output time)
         $stmt = $conn->prepare("INSERT INTO tblmeet 
             (meetID, meetName, meetDate, meetInfo, external, course)
             VALUES (null, :meetName, :meetDate, :meetInfo, :external, :course)");
@@ -71,7 +74,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $stmt->bindParam(':course', $course);
         $stmt->execute();
 
-        // Redirect: go straight into the editor view
+        // Redirect to the meet editor for the newly created meet
         $newMeetId = $conn->lastInsertId();
         header("Location: admin_meetEditor.php?edit=" . urlencode($newMeetId));
         exit;
@@ -81,17 +84,15 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     } catch (Exception $e) {
         $error_message = "Validation Error: " . $e->getMessage();
     }
+
+    // Close the connection after POST handling
     $conn = null;
 }
-
-
-//Access Denied Block
 
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <title>Oundle School Swim Team - Admin Meet Creation</title>
@@ -100,22 +101,26 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 </head>
 
 <body>
-<?php include 'navbar.php'; ?>
+<?php include 'navbar.php'; ?> <!-- Shared site navigation -->
+
 <div class="main-content">
     <div class="form-section">
         <h2>Meet creation</h2>
 
+        <!-- Display any validation/DB errors from the POST handler -->
         <?php if (!empty($error_message)): ?>
             <div class="alert-fail">
                 <?= htmlspecialchars($error_message) ?>
             </div>
         <?php endif; ?>
 
+        <!-- Form posts back to this page to create a new meet -->
         <form action="admin_addMeets.php" method="post" autocomplete="off">
             <div class="form-row">
                 <input type="text" name="meetName" placeholder="Name of Meet" required>
             </div>
 
+            <!-- Course selection stored as L (longcourse) / S (shortcourse) -->
             <h3>Course type:</h3>
             <div class="form-row">
                 <select name="course" class="input" required>
@@ -124,11 +129,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 </select>
             </div>
 
+            <!-- Meet date stored as a date string -->
             <h3>Date of Meet:</h3>
             <div class="form-row">
                 <input type="date" name="meetDate" required>
             </div>
 
+            <!-- External flag stored as N (school) / Y (external) -->
             <h3>Is this meet for school?</h3>
             <div class="form-row">
                 <select name="external" class="input" required>
@@ -137,7 +144,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 </select>
             </div>
 
+            <!-- Optional description field stored in meetInfo -->
             <input type="text" name="meetInfo" placeholder="Meet description (400 characters max)" maxlength="400" required>
+
             <button type="submit">Create Meet</button>
         </form>
     </div>

@@ -2,10 +2,11 @@
 session_start();
 include_once('connection.php');
 include_once('auth.php');
-enforceSessionPolicies($conn);
+enforceSessionPolicies($conn); // Apply session timeout + role sync before allowing admin actions
 
+// Access control: admin-only (role 2)
 if (!isset($_SESSION['role']) || (int)$_SESSION['role'] !== 2) {
-    // Access denied page (admin only)
+    // Render access denied page and stop (prevents non-admins from triggering rollover)
     echo '<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -32,17 +33,19 @@ if (!isset($_SESSION['role']) || (int)$_SESSION['role'] !== 2) {
     exit();
 }
 
-// System settings: annual rollover guard (last_rollover_year + timestamp)
+// System settings storage used to guard/track annual rollover operations
 $conn->exec("CREATE TABLE IF NOT EXISTS tblsystem (
     syskey VARCHAR(50) PRIMARY KEY,
     sysvalue VARCHAR(50) NOT NULL
 )");
+
+// Seed baseline keys if they don't exist yet (records last rollover year and timestamp)
 $seed = $conn->prepare("INSERT IGNORE INTO tblsystem (syskey, sysvalue) VALUES
     ('last_rollover_year','0'),
     ('last_rollover_at','')");
 $seed->execute();
 
-// CSRF token
+// Create CSRF token once per session to protect the rollover action from cross-site requests
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
@@ -50,7 +53,7 @@ if (empty($_SESSION['csrf_token'])) {
 $message = '';
 $error = '';
 
-// Read last rollover info
+// Load last rollover metadata for display (year + timestamp)
 $lastYear = '0';
 $lastAt = '';
 try {
@@ -65,40 +68,43 @@ try {
     $error = "Database Error: " . htmlspecialchars($e->getMessage());
 }
 
-// Handle rollover request
+// Handle rollover request (POST action from the confirmation form)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'rollover_users') {
     try {
-        // Validate CSRF
+        // Validate CSRF token from form against the session token
         $csrf = $_POST['csrf_token'] ?? '';
         if (!hash_equals($_SESSION['csrf_token'] ?? '', $csrf)) {
             throw new Exception("Invalid session token. Please try again.");
         }
 
-        // Perform rollover inside a transaction
+        // Ensure the updates (graduate + increment + metadata updates) all succeed or all fail together
         $conn->beginTransaction();
 
-        // Graduate original Year 13 first (become Guests, yearg = 0)
+        // Step 1: graduate Year 13 students (role=1) into Guests (role=0) and clear year group to 0
         $gradCount = $conn->exec("UPDATE tbluser SET role = 0, yearg = 0 WHERE role = 1 AND yearg = 13");
 
-        // Then advance Years 7–12 by +1 (so Year 12 -> Year 13 remains role=1)
+        // Step 2: promote Years 7–12 by +1 (keeps them as students, role=1)
         $incCount = $conn->exec("UPDATE tbluser SET yearg = yearg + 1 WHERE role = 1 AND yearg BETWEEN 7 AND 12");
 
-        // Record rollover time and year
+        // Capture rollover time for logging/display (stored as year + timestamp string)
         $tz = new DateTimeZone('Europe/London');
         $now = new DateTime('now', $tz);
         $yearStr = (string)$now->format('Y');
         $iso = $now->format('Y-m-d H:i:s');
 
+        // Persist "last rollover year" in tblsystem
         $updY = $conn->prepare("UPDATE tblsystem SET sysvalue = :y WHERE syskey = 'last_rollover_year'");
         $updY->bindValue(':y', $yearStr);
         $updY->execute();
 
+        // Persist "last rollover timestamp" in tblsystem
         $updT = $conn->prepare("UPDATE tblsystem SET sysvalue = :t WHERE syskey = 'last_rollover_at'");
         $updT->bindValue(':t', $iso);
         $updT->execute();
 
         $conn->commit();
 
+        // Update values shown on page without requiring a reload
         $lastYear = $yearStr;
         $lastAt = $iso;
         $message = "Rollover complete: advanced {$incCount} students (Years 7–12); graduated {$gradCount} students (Year 13).";
@@ -120,15 +126,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<?php include 'navbar.php'; ?>
+<?php include 'navbar.php'; ?> <!-- Shared site navigation -->
 
 <div class="main-content">
     <div class="page-title">Roll Over Users</div>
 
+    <!-- Display any error messages from setup/DB reads/rollover action -->
     <?php if (!empty($error)): ?>
         <div class="alert-fail"><?= htmlspecialchars($error) ?></div>
     <?php endif; ?>
 
+    <!-- Display success message after a completed rollover -->
     <?php if (!empty($message)): ?>
         <div class="alert-success"><?= htmlspecialchars($message) ?></div>
     <?php endif; ?>
@@ -138,6 +146,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         <p><strong>Year:</strong> <?= htmlspecialchars($lastYear) ?></p>
         <p><strong>Timestamp:</strong> <?= $lastAt !== '' ? htmlspecialchars($lastAt) : 'Never' ?></p>
 
+        <!-- Admin action form posts back to this page and includes CSRF token -->
         <form method="post" id="rolloverForm" class="form-section form-section--wide">
             <input type="hidden" name="action" value="rollover_users">
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
@@ -149,7 +158,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 </div>
 
 <script>
-// Confirm popup before performing rollover
+// Client-side confirmation to reduce accidental rollover actions
 document.getElementById('rolloverForm')?.addEventListener('submit', function(e) {
     const ok = confirm('This will roll over all students:\n- Years 7–12 move up one\n- Year 13 become Guests (yearg = 0)\nProceed?');
     if (!ok) e.preventDefault();

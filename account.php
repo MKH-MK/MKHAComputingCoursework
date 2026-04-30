@@ -2,9 +2,11 @@
 session_start();
 include_once('connection.php');
 include_once('auth.php');
-enforceSessionPolicies($conn);
+enforceSessionPolicies($conn); // Enforce session rules (e.g., timeouts) before any account data is shown
 
+// Access control: require a logged-in username in session
 if (!isset($_SESSION['userName'])) {
+    // Render an access-denied page (no redirects) and stop execution
     echo '<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -32,6 +34,8 @@ if (!isset($_SESSION['userName'])) {
 }
 
 /* Load the logged-in (self) user first */
+
+// Load the currently logged-in user record (used both as viewer identity and as default displayed account)
 $selfRow = null;
 try {
     $stSelf = $conn->prepare("
@@ -43,8 +47,9 @@ try {
     $stSelf->bindValue(':uname', $_SESSION['userName'], PDO::PARAM_STR);
     $stSelf->execute();
     $selfRow = $stSelf->fetch(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {}
+} catch (PDOException $e) {} // Ignore DB errors here and fall through to "not found" handling below
 
+// If the session username is not found in tbluser, show an error page (prevents rendering with missing data)
 if (!$selfRow) {
     echo '<!DOCTYPE html>
 <html lang="en">
@@ -70,13 +75,17 @@ if (!$selfRow) {
     exit();
 }
 
+// Viewer role is taken from the logged-in user (controls whether they can view other users via userID param)
 $viewerRole = (int)$selfRow['role'];
 
+// Default displayed user is "self" unless a different valid userID is requested and allowed
 $userRow = $selfRow;
 
+// If viewer is at least role 1 and a userID is provided, allow viewing another account (unless it’s their own)
 if ($viewerRole >= 1 && isset($_GET['userID']) && ctype_digit((string)$_GET['userID']) && (int)$_GET['userID'] > 0) {
     $targetID = (int)$_GET['userID'];
     if ($targetID !== (int)$selfRow['userID']) {
+        // Load the target user row by userID and swap it into $userRow if found
         try {
             $stTarget = $conn->prepare("
                 SELECT userID, userName, forename, surname, yearg, emailAddress, gender, role, description
@@ -95,12 +104,18 @@ if ($viewerRole >= 1 && isset($_GET['userID']) && ctype_digit((string)$_GET['use
 }
 
 /* Helper: HTML escape */
+
+// Centralized HTML escaping helper for safe output in templates
 function h($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 
 /* Role label for displayed user */
+
+// Human-readable label derived from the displayed user's role value
 $roleLabel = ((int)$userRow['role'] === 2) ? 'Administrator/Coach' : (((int)$userRow['role'] === 1) ? 'Student' : 'Guest');
 
 /* Install-order event names (INDIV only in PB table) */
+
+// Event ordering used for PB table output (relay events are included here but filtered out later)
 $installOrder = [
     'Backstroke 50m','Backstroke 100m','Backstroke 200m',
     'Breastroke 50m','Breastroke 100m','Breastroke 200m',
@@ -111,13 +126,16 @@ $installOrder = [
     'Freestyle Relay 400m','Medlay Relay 400m','Mixed Freestyle Relay 400m','Mixed Medlay Relay 400m'
 ];
 
+// Initialize PB storage for each individual event (short/long course time + date)
 $events = [];
 foreach ($installOrder as $evName) {
-    if (stripos($evName, 'Relay') !== false) continue; // INDIV PBs only
+    if (stripos($evName, 'Relay') !== false) continue; // PBs table only tracks individual events
     $events[$evName] = ['short' => null, 'short_date' => null, 'long' => null, 'long_date' => null];
 }
 
 /* Canonical time parser "MM:SS.hh" -> centiseconds */
+
+// Convert a canonical time string to an integer centisecond value for numeric comparisons
 function parseCanonicalToCentiseconds(string $t): ?int {
     $t = trim($t);
     if ($t === '') return null;
@@ -130,6 +148,8 @@ function parseCanonicalToCentiseconds(string $t): ?int {
 }
 
 /* Fetch INDIV results for displayed user and compute PBs */
+
+// Pull all individual swims for the displayed user (used to compute best times per event/course)
 $userResults = [];
 try {
     $resStmt = $conn->prepare("
@@ -142,13 +162,15 @@ try {
     $resStmt->bindValue(':uid', (int)$userRow['userID'], PDO::PARAM_INT);
     $resStmt->execute();
     $userResults = $resStmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {}
+} catch (PDOException $e) {} // Ignore DB errors and allow page to render without PBs
 
+// Iterate each swim and keep the fastest (lowest) centisecond value per event for short/long course
 foreach ($userResults as $r) {
     $ename = $r['eventName'];
-    if (!isset($events[$ename])) continue;
+    if (!isset($events[$ename])) continue; // Skip events not in the predefined list/order
+
     $cs = parseCanonicalToCentiseconds(trim($r['time'] ?? ''));
-    if ($cs === null) continue;
+    if ($cs === null) continue; // Skip empty/malformed times so they don't affect PB calculations
 
     if ($r['eventCourse'] === 'S') {
         $curCs = $events[$ename]['short'] ? parseCanonicalToCentiseconds($events[$ename]['short']) : null;
@@ -166,6 +188,8 @@ foreach ($userResults as $r) {
 }
 
 /* Relay participation (meetID+eventID schema) */
+
+// Fetch relay teams the displayed user has participated in (includes team, leg, total time, and meet link fields)
 $relayRows = [];
 try {
     $sql = "SELECT 
@@ -186,6 +210,7 @@ try {
     $relayRows = $st->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {}
 
+// Build the ordered list of individual event names for the PB table (relay event names removed)
 $eventNamesOrdered = array_filter($installOrder, fn($n) => stripos($n, 'Relay') === false);
 ?>
 <!DOCTYPE html>
@@ -198,12 +223,12 @@ $eventNamesOrdered = array_filter($installOrder, fn($n) => stripos($n, 'Relay') 
 </head>
 <body>
 
-<?php include 'navbar.php'; ?>
+<?php include 'navbar.php'; ?> <!-- Shared site navigation -->
 
 <div class="main-content">
     <div class="page-title">Account</div>
 
-    <!-- PERSONAL DETAILS -->
+    <!-- Personal details table for the displayed user -->
     <div class="section">
         <h2>Personal Details</h2>
         <div class="table-wrap">
@@ -241,7 +266,7 @@ $eventNamesOrdered = array_filter($installOrder, fn($n) => stripos($n, 'Relay') 
         </div>
     </div>
 
-    <!-- PERSONAL BESTS (INDIV only) -->
+    <!-- PB table: fastest individual times per event for shortcourse/longcourse -->
     <div class="section">
         <h2>Personal Bests</h2>
         <div class="table-wrap">
@@ -266,7 +291,7 @@ $eventNamesOrdered = array_filter($installOrder, fn($n) => stripos($n, 'Relay') 
         </div>
     </div>
 
-    <!-- RELAY PARTICIPATION -->
+    <!-- Relay history table: relay events the user participated in, including leg number and meet link -->
     <div class="section">
         <h2>Relay Participation</h2>
         <div class="table-wrap">
@@ -305,6 +330,3 @@ $eventNamesOrdered = array_filter($installOrder, fn($n) => stripos($n, 'Relay') 
         </div>
     </div>
 </div>
-
-</body>
-</html>
